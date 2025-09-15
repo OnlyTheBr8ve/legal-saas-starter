@@ -4,6 +4,8 @@ import crypto from "node:crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // never prerender
+export const revalidate = 0;
 
 type GenPayload = {
   template?: string;
@@ -13,9 +15,7 @@ type GenPayload = {
 };
 
 function safeJSON(input: unknown): Record<string, any> {
-  if (typeof input === "string") {
-    try { return JSON.parse(input); } catch { return {}; }
-  }
+  if (typeof input === "string") { try { return JSON.parse(input); } catch { return {}; } }
   if (input && typeof input === "object") return input as Record<string, any>;
   return {};
 }
@@ -26,7 +26,7 @@ function interpolate(tpl: string, data: Record<string, any>) {
   );
 }
 
-// Lazy init Supabase only when envs exist
+// Lazy init Supabase only when envs exist (avoid build-time error)
 function getSupabase(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -100,9 +100,7 @@ If any {{placeholders}} remain, replace or clearly mark them. Output only the fi
     const txt = await resp.text();
     try {
       const j = JSON.parse(txt);
-      if (j?.error?.code === "insufficient_quota") {
-        return new Response("OpenAI quota exceeded for this API key. Add credits and retry.", { status: 402 });
-      }
+      if (j?.error?.code === "insufficient_quota") return new Response("OpenAI quota exceeded. Add credits and retry.", { status: 402 });
       if (j?.error?.message) return new Response(`OpenAI error: ${j.error.message}`, { status: 500 });
     } catch {}
     return new Response("OpenAI error: " + txt, { status: 500 });
