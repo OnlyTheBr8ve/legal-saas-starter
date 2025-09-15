@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", { apiVersion: "2024-06-20" });
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", { apiVersion: "2023-10-16" });
 
   if (!sig || !endpointSecret) {
     return new Response("Missing signature or secret", { status: 400 });
