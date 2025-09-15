@@ -1,6 +1,7 @@
+// app/api/generate/route.ts
 import { NextRequest } from "next/server";
 import crypto from "node:crypto";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
@@ -12,47 +13,68 @@ type GenPayload = {
 };
 
 function safeJSON(input: unknown): Record<string, any> {
-  if (typeof input === "string") { try { return JSON.parse(input); } catch { return {}; } }
+  if (typeof input === "string") {
+    try { return JSON.parse(input); } catch { return {}; }
+  }
   if (input && typeof input === "object") return input as Record<string, any>;
   return {};
 }
 
+// Replace {{key}} with vars[key]
 function interpolate(tpl: string, data: Record<string, any>) {
   return (tpl || "").replace(/{{\s*([\w.-]+)\s*}}/g, (_m, k) =>
     data && data[k] !== undefined ? String(data[k]) : `{{${k}}}`
   );
 }
 
+// Lazy, safe Supabase init (only if envs exist)
+function getSupabase(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
 export async function POST(req: NextRequest) {
+  // Parse body
   let body: GenPayload;
   try { body = await req.json(); } catch { return new Response("Bad JSON body", { status: 400 }); }
   const { template = "", variables = "{}", instructions = "", jurisdiction = "" } = body;
 
+  // Interpolate server-side (saves tokens)
   const vars = safeJSON(variables);
   const filled = interpolate(template, vars);
 
-  const haveSupabase =
-    !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Supabase (optional)
+  const supabase = getSupabase();
+  const haveSupabase = !!supabase;
 
-  // --- rate limit: 3/day/IP ---
+  // --- Free-tier rate limit: 3/day/IP ---
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
   const today = new Date().toISOString().slice(0, 10);
-  if (haveSupabase) {
+  if (supabase) {
     const { data: rl } = await supabase
-      .from("rate_limits").select("count").eq("ip", ip).eq("day", today).maybeSingle();
+      .from("rate_limits")
+      .select("count")
+      .eq("ip", ip)
+      .eq("day", today)
+      .maybeSingle();
     if ((rl?.count ?? 0) >= 3) {
       return new Response("Daily free limit reached. Try again tomorrow or upgrade to Pro.", { status: 429 });
     }
     await supabase.from("rate_limits").upsert({ ip, day: today, count: (rl?.count ?? 0) + 1 }).select();
   }
 
-  // --- cache lookup ---
+  // --- Cache lookup ---
   const payloadForHash = JSON.stringify({ filled, instructions, jurisdiction, model: "gpt-4o-mini" });
   const hash = crypto.createHash("sha256").update(payloadForHash).digest("hex");
 
-  if (haveSupabase) {
+  if (supabase) {
     const { data: cached } = await supabase
-      .from("cache_entries").select("result").eq("hash", hash).maybeSingle();
+      .from("cache_entries")
+      .select("result")
+      .eq("hash", hash)
+      .maybeSingle();
     if (cached?.result) {
       return new Response(cached.result, {
         status: 200,
@@ -61,6 +83,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // --- Prompt (tight output, plain English) ---
   const sys = `You are a legal-document drafting assistant.
 - You do NOT provide legal advice.
 - Output the final document text ONLY (no explanations).
@@ -106,9 +129,12 @@ If any {{placeholders}} remain, replace or clearly mark them. Output only the fi
   const data = await resp.json();
   const text: string = data?.choices?.[0]?.message?.content ?? "No content generated.";
 
-  if (haveSupabase && text) {
+  if (supabase && text) {
     await supabase.from("cache_entries").upsert({ hash, result: text }).select();
   }
 
-  return new Response(text, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Cache": "MISS" } });
+  return new Response(text, {
+    status: 200,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Cache": "MISS" }
+  });
 }
