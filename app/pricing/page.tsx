@@ -31,7 +31,6 @@ export default function Pricing() {
             <li>Lightweight e-sign</li>
             <li>Priority processing</li>
           </ul>
-          {/* This button will call Stripe in the next step */}
           <form action="/api/checkout" method="POST">
             <button className="btn">Upgrade to Pro</button>
           </form>
