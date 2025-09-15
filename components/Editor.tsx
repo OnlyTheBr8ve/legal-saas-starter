@@ -3,12 +3,15 @@
 
 import { useState } from 'react';
 
-export default function Editor({ initial }: { initial?: string }) {
-  const [template, setTemplate] = useState(initial ?? '');
-  const [variables, setVariables] = useState('{
-  "employer_name": "Example Ltd",
-  "employee_name": "Jordan Doe"
-}');
+const [template, setTemplate] = useState(initial ?? '');
+
+  // Use a real object and stringify it so we never break on quotes/newlines
+  const defaultVars = {
+    employer_name: "Example Ltd",
+    employee_name: "Jordan Doe"
+  };
+  const [variables, setVariables] = useState(JSON.stringify(defaultVars, null, 2));
+
   const [instructions, setInstructions] = useState('Adjust tone to plain English and UK SME norms.');
   const [jurisdiction, setJurisdiction] = useState('UK');
 
