@@ -3,11 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 const secret = process.env.STRIPE_SECRET_KEY || "";
-const stripe =
-  secret &&
-  new Stripe(secret, {
-    apiVersion: "2024-06-20",
-  });
+const stripe = secret ? new Stripe(secret) : null;
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,13 +19,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
 
-    // Stripe allows listing by email in test and live
+    // Find customer by email (test or live depending on your key)
     const customers = await stripe.customers.list({ email, limit: 1 });
     const customer = customers.data[0];
     if (!customer) {
       return NextResponse.json({ pro: false, reason: "no_customer" });
     }
 
+    // Look for an active subscription
     const subs = await stripe.subscriptions.list({
       customer: customer.id,
       status: "active",
