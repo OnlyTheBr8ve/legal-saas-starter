@@ -1,65 +1,66 @@
 // app/api/checkout/route.ts
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
 
-export const runtime = "nodejs";
-
-function getOrigin(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (origin) return origin;
-  const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
-  return `${proto}://${host}`;
+function getRequiredEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env var: ${name}`);
+  return v;
 }
 
 export async function POST(req: NextRequest) {
-  const form = await req.formData().catch(() => null);
-  const plan = (form?.get("plan")?.toString() ?? "monthly").toLowerCase();
+  try {
+    // Read POSTed form fields from the pricing page
+    const form = await req.formData();
+    const plan = String(form.get("plan") || "");
+    const email = String(form.get("email") || "").trim();
 
-  const secret = process.env.STRIPE_SECRET_KEY;
-  const priceMonthly = process.env.STRIPE_PRICE_MONTHLY;
-  const priceAnnual = process.env.STRIPE_PRICE_ANNUAL;
+    if (!["monthly", "annual"].includes(plan)) {
+      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    }
+    if (!email) {
+      return NextResponse.json({ error: "Email required" }, { status: 400 });
+    }
 
-  // Not configured yet? Show a friendly message so the button still "works".
-  if (!secret || !priceMonthly || !priceAnnual) {
-    return new Response(
-      "Stripe not configured yet. Add STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL in Vercel → Settings → Environment Variables, then redeploy.",
-      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+    const STRIPE_SECRET_KEY = getRequiredEnv("STRIPE_SECRET_KEY");
+    const PRICE_MONTHLY = getRequiredEnv("STRIPE_PRICE_MONTHLY");
+    const PRICE_ANNUAL = getRequiredEnv("STRIPE_PRICE_ANNUAL");
+
+    const priceId = plan === "monthly" ? PRICE_MONTHLY : PRICE_ANNUAL;
+
+    // Initialize Stripe (omit explicit apiVersion to avoid TS mismatch issues)
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+
+    // Where to send the user after checkout (existing pages)
+    const origin = req.nextUrl.origin;
+    const success_url = `${origin}/dashboard?upgrade=success`;
+    const cancel_url = `${origin}/pricing?canceled=1`;
+
+    // Create the Checkout Session for a subscription
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url,
+      cancel_url,
+      allow_promotion_codes: true,
+      // This will send receipts and associate a Customer in Stripe
+      customer_email: email,
+      // Helpful later when you handle webhooks
+      metadata: { plan, email },
+      automatic_tax: { enabled: true },
+    });
+
+    if (!session.url) {
+      return NextResponse.json({ error: "No checkout URL from Stripe" }, { status: 500 });
+    }
+
+    // 303 redirect per Stripe docs
+    return NextResponse.redirect(session.url, 303);
+  } catch (err: any) {
+    console.error("Checkout error:", err);
+    return NextResponse.json(
+      { error: err?.message || "Checkout failed" },
+      { status: 500 }
     );
   }
-
-  const origin = getOrigin(req);
-  const price = plan === "annual" ? priceAnnual : priceMonthly;
-
-  // Create a Checkout Session via Stripe's HTTP API (no extra dependency)
-  const body = new URLSearchParams({
-    mode: "subscription",
-    "line_items[0][price]": price,
-    "line_items[0][quantity]": "1",
-    success_url: `${origin}/dashboard?upgrade=success`,
-    cancel_url: `${origin}/pricing?canceled=1`,
-  });
-
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    return new Response(`Stripe error: ${text}`, { status: 500 });
-  }
-
-  const data = await res.json();
-  const url = (data as any)?.url as string | undefined;
-  if (!url) return new Response("Stripe error: missing session url", { status: 500 });
-
-  return Response.redirect(url, 303);
-}
-
-export async function GET() {
-  return new Response("Method not allowed", { status: 405 });
 }
