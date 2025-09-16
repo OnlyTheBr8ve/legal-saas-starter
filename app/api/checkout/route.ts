@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-function getRequiredEnv(name: string): string {
+export const runtime = "nodejs";
+
+function need(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
   return v;
@@ -10,44 +12,35 @@ function getRequiredEnv(name: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    // Read POSTed form fields from the pricing page
+    // Read form fields from /pricing
     const form = await req.formData();
-    const plan = String(form.get("plan") || "");
+    const plan = String(form.get("plan") || "monthly").toLowerCase();
     const email = String(form.get("email") || "").trim();
 
     if (!["monthly", "annual"].includes(plan)) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
-    if (!email) {
-      return NextResponse.json({ error: "Email required" }, { status: 400 });
-    }
 
-    const STRIPE_SECRET_KEY = getRequiredEnv("STRIPE_SECRET_KEY");
-    const PRICE_MONTHLY = getRequiredEnv("STRIPE_PRICE_MONTHLY");
-    const PRICE_ANNUAL = getRequiredEnv("STRIPE_PRICE_ANNUAL");
+    const STRIPE_SECRET_KEY = need("STRIPE_SECRET_KEY");
+    const PRICE_MONTHLY = need("STRIPE_PRICE_MONTHLY");
+    const PRICE_ANNUAL = need("STRIPE_PRICE_ANNUAL");
+    const priceId = plan === "annual" ? PRICE_ANNUAL : PRICE_MONTHLY;
 
-    const priceId = plan === "monthly" ? PRICE_MONTHLY : PRICE_ANNUAL;
-
-    // Initialize Stripe (omit explicit apiVersion to avoid TS mismatch issues)
+    // Initialize Stripe (no explicit apiVersion to avoid TS mismatch)
     const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-    // Where to send the user after checkout (existing pages)
+    // Solid origin on Vercel
     const origin = req.nextUrl.origin;
-    const success_url = `${origin}/dashboard?upgrade=success`;
-    const cancel_url = `${origin}/pricing?canceled=1`;
 
-    // Create the Checkout Session for a subscription
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url,
-      cancel_url,
+      customer_email: email || undefined,
       allow_promotion_codes: true,
-      // This will send receipts and associate a Customer in Stripe
-      customer_email: email,
-      // Helpful later when you handle webhooks
-      metadata: { plan, email },
       automatic_tax: { enabled: true },
+      metadata: { plan, email },
+      success_url: `${origin}/dashboard?upgraded=1`,
+      cancel_url: `${origin}/dashboard?canceled=1`,
     });
 
     if (!session.url) {
@@ -63,4 +56,8 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }
