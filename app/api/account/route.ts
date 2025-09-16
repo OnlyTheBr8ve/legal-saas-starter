@@ -1,8 +1,8 @@
-// app/api/account/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 const secret = process.env.STRIPE_SECRET_KEY || "";
+// Don’t pin apiVersion; let the Stripe SDK use its default to avoid TS mismatches
 const stripe = secret ? new Stripe(secret) : null;
 
 export async function GET(req: NextRequest) {
@@ -19,19 +19,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
 
-    // Find customer by email (test or live depending on your key)
+    // Find the customer by email
     const customers = await stripe.customers.list({ email, limit: 1 });
     const customer = customers.data[0];
     if (!customer) {
       return NextResponse.json({ pro: false, reason: "no_customer" });
     }
 
-    // Look for an active subscription
+    // Get an active subscription (no deep expand needed)
     const subs = await stripe.subscriptions.list({
       customer: customer.id,
       status: "active",
       limit: 1,
-      expand: ["data.items.data.price.product"],
     });
 
     const sub = subs.data[0];
@@ -43,7 +42,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const priceId = sub.items.data[0]?.price?.id || "";
+    // Safely pull the price id whether Stripe returned an object or a string
+    const firstItem = sub.items.data[0];
+    let priceId = "";
+    const priceVal: unknown = firstItem?.price as unknown;
+
+    if (typeof priceVal === "string") {
+      priceId = priceVal;
+    } else if (priceVal && typeof priceVal === "object" && "id" in (priceVal as any)) {
+      priceId = (priceVal as any).id ?? "";
+    }
+
     let plan: "monthly" | "annual" | "unknown" = "unknown";
     if (priceId === process.env.STRIPE_PRICE_MONTHLY) plan = "monthly";
     else if (priceId === process.env.STRIPE_PRICE_ANNUAL) plan = "annual";
