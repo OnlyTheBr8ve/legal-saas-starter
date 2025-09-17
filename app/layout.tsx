@@ -19,6 +19,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/pricing" className="text-white/80 hover:text-white">Pricing</a>
             {/* For now, Upgrade points to Pricing. We'll wire Stripe next. */}
             <a href="/pricing" className="btn">Upgrade</a>
+            import Link from 'next/link';
+
+// …inside the nav
+<Link href="/login" className="text-white/80 hover:text-white">Login</Link>
+
           </nav>
         </header>
 
