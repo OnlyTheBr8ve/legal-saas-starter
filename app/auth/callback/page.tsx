@@ -1,15 +1,19 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabase } from '@/lib/supabaseClient';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // This triggers Supabase to parse the URL fragment and set the session.
-    // Once it’s done (or even if it was already set), send the user onward.
+    const supabase = getSupabase();
+
+    // Trigger a session read; with detectSessionInUrl: true, the client
+    // processes the magic-link fragment and stores the session.
     supabase.auth.getSession().finally(() => {
       router.replace('/dashboard');
     });
