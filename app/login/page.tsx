@@ -1,7 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { FormEvent, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabase } from '@/lib/supabaseClient';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,13 +17,12 @@ export default function LoginPage() {
     setOk(null);
     setErr(null);
     try {
+      const supabase = getSupabase();
       const redirectTo = `${window.location.origin}/auth/callback`;
-
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: redirectTo },
       });
-
       if (error) throw error;
       setOk('Magic link sent! Check your inbox and click the link to finish sign-in.');
     } catch (e: any) {
@@ -34,9 +35,7 @@ export default function LoginPage() {
   return (
     <main className="space-y-8">
       <h1 className="text-4xl font-extrabold">Login</h1>
-      <p className="text-white/70">
-        Enter your email. We’ll send you a secure magic link to sign in.
-      </p>
+      <p className="text-white/70">Enter your email. We’ll send you a secure magic link to sign in.</p>
 
       <form onSubmit={onSubmit} className="max-w-md space-y-4">
         <input
