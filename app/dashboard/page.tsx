@@ -15,8 +15,9 @@ export default function Dashboard() {
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  // Only prefill once on first load (don’t clobber user edits)
+  // Only prefill once on first load
   useEffect(() => {
     if (prefillPrompt && !prompt) setPrompt(prefillPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,14 +41,12 @@ export default function Dashboard() {
       });
 
       if (!res.ok) {
-        // Try to read any error body
         const maybeText = await res.text().catch(() => "");
         throw new Error(
           maybeText || `Generation failed (${res.status} ${res.statusText})`
         );
       }
 
-      // Be tolerant of either text or JSON responses
       const ct = res.headers.get("content-type") ?? "";
       if (ct.includes("application/json")) {
         const data = await res.json();
@@ -72,6 +71,31 @@ export default function Dashboard() {
     setPrompt("");
     setOutput("");
     setError(null);
+    setCopied(false);
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Could not copy to clipboard.");
+    }
+  }
+
+  function handleDownload() {
+    const blob = new Blob([output || ""], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    // Use templateSlug in filename if present
+    const base = templateSlug ? `clausecraft-${templateSlug}` : "clausecraft-document";
+    a.href = url;
+    a.download = `${base}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -92,9 +116,7 @@ export default function Dashboard() {
       </div>
 
       <section className="space-y-3">
-        <label className="block text-sm font-medium opacity-80">
-          Prompt
-        </label>
+        <label className="block text-sm font-medium opacity-80">Prompt</label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -117,15 +139,32 @@ export default function Dashboard() {
             Clear
           </button>
         </div>
-        {error ? (
-          <p className="text-sm text-red-400">{error}</p>
-        ) : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
       </section>
 
       <section className="space-y-3">
-        <label className="block text-sm font-medium opacity-80">
-          Output
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium opacity-80">
+            Output
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCopy}
+              disabled={!output}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-sm hover:bg-white/5 disabled:opacity-50"
+            >
+              {copied ? "Copied ✓" : "Copy"}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={!output}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-sm hover:bg-white/5 disabled:opacity-50"
+            >
+              Download .txt
+            </button>
+          </div>
+        </div>
+
         <textarea
           readOnly
           value={output}
