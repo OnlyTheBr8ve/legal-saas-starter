@@ -1,5 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import Link from "next/link";
+
 
 export const metadata: Metadata = {
   title: "ClauseCraft — AI Contracts & E-Sign for SMEs",
