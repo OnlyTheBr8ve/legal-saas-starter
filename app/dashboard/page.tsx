@@ -1,16 +1,28 @@
 // app/dashboard/page.tsx
 "use client";
 
+// Ensure this page is always rendered at runtime (no prerender)
+// and never cached, so useSearchParams() is safe.
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = false;
+export const fetchCache = "force-no-store";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function Dashboard() {
+export default function DashboardPage() {
+  // Wrap the actual page in Suspense to satisfy Next's CSR bailout requirement
+  return (
+    <Suspense fallback={<div className="px-4 py-10">Loading…</div>}>
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
   const searchParams = useSearchParams();
 
-  // Prefill from the URL
+  // Prefill from URL
   const prefillPrompt = searchParams.get("prompt") ?? "";
   const templateSlug = searchParams.get("template") ?? "";
 
@@ -20,7 +32,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Only prefill once on first load
+  // Only prefill once on first load (don’t clobber user edits)
   useEffect(() => {
     if (prefillPrompt && !prompt) setPrompt(prefillPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,11 +100,14 @@ export default function Dashboard() {
   }
 
   function handleDownload() {
-    const blob = new Blob([output || ""], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([output || ""], {
+      type: "text/plain;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    // Use templateSlug in filename if present
-    const base = templateSlug ? `clausecraft-${templateSlug}` : "clausecraft-document";
+    const base = templateSlug
+      ? `clausecraft-${templateSlug}`
+      : "clausecraft-document";
     a.href = url;
     a.download = `${base}.txt`;
     document.body.appendChild(a);
@@ -147,9 +162,7 @@ export default function Dashboard() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium opacity-80">
-            Output
-          </label>
+          <label className="block text-sm font-medium opacity-80">Output</label>
           <div className="flex gap-2">
             <button
               onClick={handleCopy}
