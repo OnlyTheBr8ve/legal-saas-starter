@@ -2,8 +2,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-saas-starter.vercel.app";
@@ -75,10 +73,6 @@ export default function RootLayout({
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-6 py-10">{children}</main>
-
-        {/* Observability (no config needed) */}
-        <Analytics />
-        <SpeedInsights />
       </body>
     </html>
   );
