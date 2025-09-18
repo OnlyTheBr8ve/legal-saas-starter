@@ -1,3 +1,38 @@
+import type { Metadata } from "next";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-saas-starter.vercel.app";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "ClauseCraft — AI Contracts & E-Sign for SMEs",
+    template: "%s · ClauseCraft",
+  },
+  description:
+    "Generate, edit, and e-sign SME-friendly documents with an AI copilot. Start free, upgrade for advanced features and unlimited storage.",
+  alternates: {
+    canonical: "/",
+    sitemap: "/sitemap.xml",
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "ClauseCraft",
+    title: "ClauseCraft — AI Contracts & E-Sign for SMEs",
+    description:
+      "Generate, edit, and e-sign SME-friendly documents with an AI copilot.",
+    images: [{ url: "/opengraph-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ClauseCraft — AI Contracts & E-Sign for SMEs",
+    description:
+      "Generate, edit, and e-sign SME-friendly documents with an AI copilot.",
+    images: ["/opengraph-image.png"],
+  },
+};
+
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
