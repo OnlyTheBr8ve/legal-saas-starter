@@ -1,17 +1,14 @@
 // app/dashboard/page.tsx
 "use client";
 
-// Ensure this page is always rendered at runtime (no prerender)
-// and never cached, so useSearchParams() is safe.
+// Force runtime rendering so Next won't try to prerender this page.
 export const dynamic = "force-dynamic";
-export const revalidate = false;
-export const fetchCache = "force-no-store";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function DashboardPage() {
-  // Wrap the actual page in Suspense to satisfy Next's CSR bailout requirement
+  // Wrap the actual page in Suspense to satisfy Next's CSR bailout requirement for useSearchParams()
   return (
     <Suspense fallback={<div className="px-4 py-10">Loading…</div>}>
       <DashboardInner />
