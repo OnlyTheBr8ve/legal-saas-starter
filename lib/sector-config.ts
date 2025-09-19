@@ -1,107 +1,136 @@
-export type FollowUp = {
+// Sector-specific toggles and snippets to enrich prompts.
+
+export type SectorKey =
+  | "general"
+  | "hospitality"
+  | "construction"
+  | "healthcare"
+  | "retail"
+  | "technology";
+
+export type SectorToggle = {
   id: string;
   label: string;
-  help?: string;
-  injectWhenTrue: string;
+  description?: string;
+  clauseSnippet: string;
 };
 
-export type SectorConfig = {
-  key: string;
-  label: string;
-  followUps: FollowUp[];
-};
-
-export const SECTORS: SectorConfig[] = [
-  {
-    key: "hospitality",
-    label: "Hospitality",
-    followUps: [
+export const SECTOR_CONFIG: Record<
+  SectorKey,
+  { name: string; toggles: SectorToggle[] }
+> = {
+  general: {
+    name: "General",
+    toggles: [
       {
-        id: "personalLicence",
-        label: "Requires Personal Licence?",
-        help: "Premises alcohol authorisation responsibilities.",
-        injectWhenTrue:
-          "This role requires holding a Personal Licence. Loss, suspension, or revocation of the licence will constitute grounds for review and possible reassignment or termination, subject to fair process."
+        id: "probation",
+        label: "Include probation period",
+        clauseSnippet:
+          "Include a 3–6 month probation with simplified termination and performance review checkpoints."
       },
       {
-        id: "tronc",
-        label: "Tips/Tronc applies?",
-        injectWhenTrue:
-          "Tips/tronc are distributed under a fair allocation policy and processed via PAYE where applicable. They are not guaranteed income."
-      },
-      {
-        id: "unsocial",
-        label: "Unsocial hours?",
-        injectWhenTrue:
-          "Rota includes evenings/weekends/bank holidays. Premium rates/time off in lieu may apply in line with policy."
+        id: "ip-confidentiality",
+        label: "Strong IP & confidentiality",
+        clauseSnippet:
+          "Reinforce confidentiality and full assignment of IP to the company, with survival post-termination."
       }
     ]
   },
-  {
-    key: "construction",
-    label: "Construction",
-    followUps: [
+  hospitality: {
+    name: "Hospitality",
+    toggles: [
+      {
+        id: "personal-licence",
+        label: "Personal licence required",
+        clauseSnippet:
+          "Add a clause that employment is conditional on holding a valid Personal Licence; loss or suspension triggers review or reassignment."
+      },
+      {
+        id: "food-safety",
+        label: "Food hygiene & safety",
+        clauseSnippet:
+          "Include mandatory adherence to food hygiene standards (HACCP), temperature logs, allergen procedures, and customer safety."
+      },
+      {
+        id: "tronc-tips",
+        label: "Tronc / tips handling",
+        clauseSnippet:
+          "Describe tronc distribution rules, transparency, and that tips are not guaranteed compensation."
+      }
+    ]
+  },
+  construction: {
+    name: "Construction",
+    toggles: [
       {
         id: "cscs",
-        label: "CSCS card required?",
-        injectWhenTrue:
-          "The worker must hold and maintain a valid CSCS card for the role at all times and comply with site safety rules."
+        label: "CSCS / Competency required",
+        clauseSnippet:
+          "Require valid CSCS card (or equivalent competency), with duty to maintain and present on request."
       },
       {
-        id: "safetyCritical",
-        label: "Safety‑critical duties?",
-        injectWhenTrue:
-          "Medical fitness and PPE compliance are mandatory. Breach of site safety may be treated as gross misconduct."
+        id: "rams",
+        label: "RAMS & site rules",
+        clauseSnippet:
+          "Contractor must provide RAMS, comply with site inductions, PPE rules, and report near-misses promptly."
+      },
+      {
+        id: "insurance",
+        label: "Insurance minimums",
+        clauseSnippet:
+          "Set minimum insurance levels (e.g., £5m Public Liability, £2m Professional Indemnity) with certificates on request."
       }
     ]
   },
-  {
-    key: "healthcare",
-    label: "Healthcare",
-    followUps: [
+  healthcare: {
+    name: "Healthcare",
+    toggles: [
       {
-        id: "dbs",
-        label: "Enhanced DBS check required?",
-        injectWhenTrue:
-          "Appointment is conditional on an enhanced DBS check and ongoing safeguarding compliance."
+        id: "patient-data",
+        label: "Patient data handling",
+        clauseSnippet:
+          "Strictly prohibit access to identifiable patient data unless necessary; include confidentiality and audit consent."
       },
       {
-        id: "registration",
-        label: "Professional registration needed?",
-        help: "e.g., NMC, HCPC or GMC",
-        injectWhenTrue:
-          "The role requires valid professional registration; lapse or suspension must be notified immediately and may affect employment."
+        id: "training",
+        label: "Mandatory training",
+        clauseSnippet:
+          "Require safeguarding, infection control, and clinical governance training with records retained."
       }
     ]
   },
-  {
-    key: "retail",
-    label: "Retail",
-    followUps: [
+  retail: {
+    name: "Retail",
+    toggles: [
       {
-        id: "cashHandling",
-        label: "Cash handling?",
-        injectWhenTrue:
-          "Cash handling and reconciliation responsibilities apply; shrinkage policy and CCTV monitoring disclosed."
+        id: "till-security",
+        label: "Till & stock security",
+        clauseSnippet:
+          "Define cash handling protocols, voids/refunds approval, and stock loss reporting to reduce shrink."
+      },
+      {
+        id: "uniform-brand",
+        label: "Uniform & brand standards",
+        clauseSnippet:
+          "Specify uniform policy, personal presentation, and brand interaction standards for customer experience."
       }
     ]
   },
-  {
-    key: "tech",
-    label: "Tech",
-    followUps: [
+  technology: {
+    name: "Technology",
+    toggles: [
       {
-        id: "ipAssignment",
-        label: "IP assignment required?",
-        injectWhenTrue:
-          "All IP created in the course of duties is assigned to the employer; moral rights waived to the extent permitted by law."
+        id: "security",
+        label: "Security & access controls",
+        clauseSnippet:
+          "Mandate MFA, least-privilege access, secure coding practices, and immediate revocation on termination."
       },
       {
-        id: "remoteFirst",
-        label: "Remote‑first role?",
-        injectWhenTrue:
-          "Remote‑first; employee must maintain secure workspace, follow infosec policy, and be reachable during core hours."
+        id: "dpa",
+        label: "Attach DPA if needed",
+        clauseSnippet:
+          "If processing personal data, include a GDPR-aligned DPA with sub-processor disclosure and 72-hour breach notice."
       }
     ]
   }
-];
+};
