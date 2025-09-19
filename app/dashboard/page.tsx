@@ -1,23 +1,41 @@
 "use client";
 
-export const dynamic = "force-dynamic"; // <-- prevents prerender errors with useSearchParams
-
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+
+// prevent SSG/ISR for this page (safe for searchParams)
+export const dynamic = "force-dynamic";
 
 const FULL_DRAFT_PRIMER = `Draft a complete, professional contract in Markdown.
 If details are missing, use [placeholders]. Include a Schedule of Key Terms.`;
 
-export default function DashboardPage() {
-  const params = useSearchParams();
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-5xl mx-auto px-6 py-10">
+          <h1 className="text-4xl font-extrabold">Dashboard</h1>
+          <p className="text-white/70 mt-2">Loading…</p>
+        </main>
+      }
+    >
+      <DashboardClient />
+    </Suspense>
+  );
+}
+
+function DashboardClient() {
+  const params = useSearchParams(); // <-- now safely inside Suspense
   const prefill = params.get("prompt") || "";
+
   const [prompt, setPrompt] = useState(prefill);
   const [sectorClauses, setSectorClauses] = useState("");
   const [out, setOut] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (prefill && !prompt) setPrompt(prefill);
+    // keep prompt in sync with URL if the user lands with ?prompt=
+    if (prefill && prompt !== prefill) setPrompt(prefill);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
@@ -70,7 +88,7 @@ export default function DashboardPage() {
           className="w-full min-h-[220px] rounded-md bg-black/30 border border-white/10 p-4 focus:outline-none focus:ring-2 focus:ring-violet-400"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Role, employment type, jurisdiction, pay, hours, probation, notice, key responsibilities, etc."
+          placeholder="Role, employment type, jurisdiction, pay, hours, probation, notice, responsibilities, etc."
         />
       </div>
 
