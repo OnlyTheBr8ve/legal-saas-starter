@@ -1,30 +1,130 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+type Detail = 'basic' | 'comprehensive';
+type Sector =
+  | 'Hospitality'
+  | 'Legal Services'
+  | 'Retail'
+  | 'Construction'
+  | 'Healthcare'
+  | 'Technology'
+  | 'Other';
+
+type EmpType = 'Full-time' | 'Part-time' | 'Zero-hours' | 'Fixed-term' | 'Casual';
+type WorkingPattern = 'On-site' | 'Hybrid' | 'Remote' | 'Shift / Rota' | 'Night work';
+
+const SECTOR_CLAUSE_PACKS: Record<Sector, string[]> = {
+  Hospitality: [
+    'Customer service standards and expected conduct',
+    'Age-restricted sales: alcohol/licensing compliance and refusal log procedures',
+    'Food hygiene: HACCP awareness, allergen handling, cross-contamination avoidance',
+    'Tips & tronc policy; card tips distribution; cash handling and reconciliation',
+    'Uniform & personal appearance; health & safety in bar/restaurant environments',
+    'Incident reporting: spills, breakages, aggression, ID challenges',
+  ],
+  'Legal Services': [
+    'SRA/Legal regulator duties: integrity, client care, conflicts, confidentiality',
+    'Client money & accounts rules; billing/time recording accuracy',
+    'Professional indemnity and supervision; reserved legal activities',
+    'Data protection and legal professional privilege; secure storage/transfer',
+    'Matter opening/closing, file management, retention and archiving',
+  ],
+  Retail: [
+    'Customer service standards; complaints escalation',
+    'Age-restricted sales (e.g., tobacco, knives) checks and refusals',
+    'Stock handling, shrinkage prevention, CCTV and bag-check policy',
+    'Till operations, refunds/exchanges, cashing up',
+    'Manual handling and in-store H&S procedures',
+  ],
+  Construction: [
+    'Site induction; CDM awareness; method statements and risk assessments',
+    'Mandatory PPE usage; plant & tools competence',
+    'Permit-to-work controls; hot works; working at height',
+    'Reporting near-misses, incidents, and unsafe conditions',
+    'Drug & alcohol testing; fitness for duty',
+  ],
+  Healthcare: [
+    'Clinical governance; duty of candour; safeguarding (children/vulnerable adults)',
+    'Infection prevention & control; vaccinations; sharps policy',
+    'Confidentiality (patient data) and records; GDPR/UK-DPA compliance',
+    'Professional registration and revalidation (where applicable)',
+    'On-call, night work, handover, escalation protocols',
+  ],
+  Technology: [
+    'Information security: access controls, secrets handling, device and BYOD policy',
+    'Secure development lifecycle; code review; vulnerability disclosure',
+    'Data protection; customer data handling; logging/monitoring',
+    'Open-source licensing, IP assignment, and contribution policy',
+    'Incident response, uptime/on-call expectations (if applicable)',
+  ],
+  Other: [
+    'Role-specific duties section tailored to the job and industry',
+    'Applicable regulatory/compliance obligations',
+    'Risk and safety practices relevant to the work environment',
+  ],
+};
 
 export default function WizardPage() {
-  // Form state
+  // --- Core identity fields ---
   const [employer, setEmployer] = useState('Example Ltd');
   const [employee, setEmployee] = useState('Jordan Doe');
-  const [role, setRole] = useState('Bar Staff');
+  const [role, setRole] = useState('Bar Staff'); // try changing to "Family Solicitor" etc.
   const [startDate, setStartDate] = useState('2025-10-01');
   const [jurisdiction, setJurisdiction] = useState('UK');
+
+  // --- Pay / Hours ---
   const [pay, setPay] = useState('£12.50 per hour, paid weekly');
   const [hours, setHours] = useState('20–30 hours per week, rota-based');
-  const [detail, setDetail] = useState<'basic' | 'comprehensive'>('comprehensive');
 
-  // Instruction scaffold: model guidance
+  // --- Specificity controls ---
+  const [sector, setSector] = useState<Sector>('Hospitality');
+  const [seniority, setSeniority] = useState('Staff');
+  const [employmentType, setEmploymentType] = useState<EmpType>('Part-time');
+  const [pattern, setPattern] = useState<WorkingPattern>('Shift / Rota');
+  const [detail, setDetail] = useState<Detail>('comprehensive');
+  const [notes, setNotes] = useState(''); // optional regulatory or client notes
+
+  // --- Instructions scaffold ---
   const baseInstructions =
-    'Write a clean, well-structured employment contract in Markdown with clear H1/H2/H3 headings, numbered clauses, and bullet points where helpful. Use plain English suitable for SMEs. Keep it practical, not academic. Ensure it suits the jurisdiction provided. Include a signature section.';
+    'Write a clean, well-structured employment contract in Markdown with clear H1/H2/H3 headings, numbered clauses, and bullet points where helpful. Use plain English suitable for SMEs. Keep it practical, not academic. Include a signature section.';
 
-  const [instructions, setInstructions] = useState(baseInstructions);
+  // Computed clause pack text
+  const selectedClausePack = useMemo(() => {
+    const packs = SECTOR_CLAUSE_PACKS[sector] || [];
+    const list = packs.map((p) => `- ${p}`).join('\n');
+    return list
+      ? `\n\n**Sector-specific clause requirements (must be included):**\n${list}\n`
+      : '';
+  }, [sector]);
 
-  // Result + UI state
-  const [result, setResult] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  function composeInstructions() {
+    const levelNote =
+      detail === 'comprehensive'
+        ? 'Ensure a full professional contract (12–18 sections), with complete, role- and sector-specific clauses. Avoid generic boilerplate.'
+        : 'Keep the document concise but complete (8–10 sections), still tailored to the role and sector.';
 
-  // Stronger, pro-grade base template (placeholders get filled server-side BEFORE AI rewrite)
+    const jHint =
+      jurisdiction.toUpperCase().startsWith('UK')
+        ? 'Follow UK norms (statutory holidays, SSP, clear plain English). Avoid US-specific concepts unless universal.'
+        : 'Follow the norms of the specified jurisdiction and avoid irrelevant foreign concepts.';
+
+    // Enforce role specificity:
+    const roleDirectives = `
+**Role specificity requirements (must do):**
+- Add a section titled "Role-Specific Duties" with at least 8 concise bullet points tailored to the exact role **"${role}"**, considering **${sector}** and **${seniority}** seniority.
+- Add a section "Regulatory & Compliance" covering obligations that actually apply in **${sector}** within **${jurisdiction}**.
+- Add a section "Risk, Safety & Conduct" reflecting hazards/controls relevant to **${pattern}** work and the sector.
+- Adapt working time, breaks, on-call/night work, and overtime expectations to **${employmentType}** and **${pattern}**.
+- Avoid filler language; prefer precise, practical obligations and processes.
+${selectedClausePack}
+${notes ? `\n**Additional context from user:** ${notes}\n` : ''}`.trim();
+
+    return `${baseInstructions}\n${levelNote}\n${jHint}\n\n${roleDirectives}`;
+  }
+
+  // Template — still filled server-side first (variables), then rewritten by AI using instructions.
   const baseTemplate = `# Employment Agreement
 
 This Employment Agreement (“Agreement”) is made between **{{employer_name}}** (“Employer”) and **{{employee_name}}** (“Employee”) for the role of **{{job_title}}**, starting on **{{start_date}}**.
@@ -33,16 +133,17 @@ This Employment Agreement (“Agreement”) is made between **{{employer_name}}*
 > This agreement sets out the terms of employment, including role, pay, hours, policies, and termination procedures. It is intended for **{{jurisdiction}}** and written for small/medium businesses in clear, practical language.
 
 ## 1. Role & Start
-- Job Title: **{{job_title}}**
+- Job Title: **{{job_title}}** (**{{seniority}}**, **{{employment_type}}**)
 - Start Date: **{{start_date}}**
+- Working Pattern: **{{working_pattern}}**
 - Location: As directed by the Employer within reasonable travel distance (including on-site and/or remote as applicable).
 - Reporting to: As designated by the Employer.
 
 ## 2. Pay & Hours
 - Pay: **{{pay}}**
 - Hours: **{{hours}}**
-- Overtime & Premiums: As required by applicable law and Employer policy.
-- Deductions: Any lawful deductions (tax, NI, etc.) will be made where applicable.
+- Overtime/Breaks: In line with law and Employer policy for **{{employment_type}}** and **{{working_pattern}}**.
+- Deductions: Lawful deductions (e.g., tax/NI) where applicable.
 
 ## 3. Duties & Performance
 - The Employee will perform the usual duties of **{{job_title}}** and any reasonable additional duties.
@@ -62,7 +163,7 @@ This Employment Agreement (“Agreement”) is made between **{{employer_name}}*
 
 ## 7. Sickness & Absence
 - Follow Employer absence reporting procedure.  
-- Statutory sick pay (SSP) applies where required by law.
+- Statutory sick pay (SSP) or equivalent applies where required by law.
 
 ## 8. Conduct & Policies
 - The Employee agrees to follow lawful Employer policies, including health & safety, equality, and data protection.
@@ -105,27 +206,15 @@ Signature: ______________________
 Date: ___________________________
 `;
 
-  function effectiveInstructions() {
-    const levelNote =
-      detail === 'comprehensive'
-        ? 'Ensure a full professional contract (12–18 sections), with complete clauses and practical defaults. Avoid filler; be precise.'
-        : 'Keep the document concise but complete (8–10 sections), still professional and ready to use.';
-
-    // Add jurisdiction hint so the model leans the right way.
-    const jHint =
-      jurisdiction.toUpperCase().startsWith('UK')
-        ? 'Follow UK norms (e.g., statutory holidays, SSP, plain English). Avoid US-specific concepts unless universal.'
-        : 'Follow the norms of the specified jurisdiction and avoid irrelevant foreign concepts.';
-
-    return `${baseInstructions} ${levelNote} ${jHint}${instructions && instructions !== baseInstructions ? `\n\nAdditional user instructions: ${instructions}` : ''}`;
-  }
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string>('');
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setErr('');
     setResult('');
-
     try {
       const variables = {
         employer_name: employer,
@@ -135,6 +224,10 @@ Date: ___________________________
         jurisdiction,
         pay,
         hours,
+        seniority,
+        employment_type: employmentType,
+        working_pattern: pattern,
+        sector,
       };
 
       const res = await fetch('/api/generate', {
@@ -142,8 +235,8 @@ Date: ___________________________
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           template: baseTemplate,
-          variables,                 // server does {{...}} replacement first
-          instructions: effectiveInstructions(),
+          variables, // server does {{...}} replacement first
+          instructions: composeInstructions(),
           jurisdiction,
         }),
       });
@@ -156,8 +249,8 @@ Date: ___________________________
       const cache = res.headers.get('X-Cache') || 'MISS';
       const text = await res.text();
       setResult(`<!-- Cache: ${cache} -->\n${text}`);
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+    } catch (e: any) {
+      setErr(e.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
@@ -168,76 +261,69 @@ Date: ___________________________
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Contract Wizard</h1>
         <p className="text-white/70 mt-1">
-          Fill the form, click generate. The output is structured in Markdown (ready to copy or export later).
+          Fill the form and generate a contract that matches the role, sector, and working pattern. Outputs are in Markdown (ready to copy/export).
         </p>
       </div>
 
-      <form onSubmit={handleGenerate} className="grid lg:grid-cols-2 gap-8">
+      <form onSubmit={handleGenerate} className="grid xl:grid-cols-2 gap-8">
         {/* LEFT: form */}
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-white/70 mb-1">Employer</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={employer}
-                onChange={(e) => setEmployer(e.target.value)}
-                required
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={employer} onChange={(e) => setEmployer(e.target.value)} required />
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Employee</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={employee}
-                onChange={(e) => setEmployee(e.target.value)}
-                required
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={employee} onChange={(e) => setEmployee(e.target.value)} required />
             </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-white/70 mb-1">Job Title</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                required
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g., Family Solicitor" required />
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Start Date</label>
-              <input
-                type="date"
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-              />
+              <input type="date" className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
             </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-white/70 mb-1">Jurisdiction</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                placeholder="UK, US-CA, US-NY…"
-                value={jurisdiction}
-                onChange={(e) => setJurisdiction(e.target.value)}
-                required
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="UK, US-CA, US-NY…" required />
             </div>
             <div>
-              <label className="block text-sm text-white/70 mb-1">Detail Level</label>
-              <select
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={detail}
-                onChange={(e) => setDetail(e.target.value as 'basic' | 'comprehensive')}
-              >
-                <option value="basic">Basic (shorter)</option>
-                <option value="comprehensive">Comprehensive (recommended)</option>
+              <label className="block text-sm text-white/70 mb-1">Sector</label>
+              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={sector} onChange={(e) => setSector(e.target.value as Sector)}>
+                {(['Hospitality','Legal Services','Retail','Construction','Healthcare','Technology','Other'] as Sector[]).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Seniority</label>
+              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={seniority} onChange={(e) => setSeniority(e.target.value)}>
+                <option>Junior</option>
+                <option>Staff</option>
+                <option>Senior</option>
+                <option>Manager</option>
+                <option>Director</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Employment Type</label>
+              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={employmentType} onChange={(e) => setEmploymentType(e.target.value as EmpType)}>
+                {(['Full-time','Part-time','Zero-hours','Fixed-term','Casual'] as EmpType[]).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Working Pattern</label>
+              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={pattern} onChange={(e) => setPattern(e.target.value as WorkingPattern)}>
+                {(['On-site','Hybrid','Remote','Shift / Rota','Night work'] as WorkingPattern[]).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           </div>
@@ -245,32 +331,26 @@ Date: ___________________________
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-white/70 mb-1">Salary/Pay</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={pay}
-                onChange={(e) => setPay(e.target.value)}
-                placeholder="£12.50 per hour, paid weekly"
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={pay} onChange={(e) => setPay(e.target.value)} placeholder="£XX,XXX per year / £X.XX per hour" />
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Hours</label>
-              <input
-                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-                placeholder="20–30 hours/week, rota-based"
-              />
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="e.g., 37.5 hours/week; rota-based" />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-white/70 mb-1">Extra Instructions (optional)</label>
-            <input
-              className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder={baseInstructions}
-            />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Detail Level</label>
+              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={detail} onChange={(e) => setDetail(e.target.value as Detail)}>
+                <option value="basic">Basic (shorter)</option>
+                <option value="comprehensive">Comprehensive (recommended)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Regulatory/Notes (optional)</label>
+              <input className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any extra context, client standards, union policy, etc." />
+            </div>
           </div>
 
           <button
@@ -281,7 +361,7 @@ Date: ___________________________
             {loading ? 'Generating…' : 'Generate Contract'}
           </button>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {err && <p className="text-sm text-red-400">{err}</p>}
 
           <p className="text-xs text-white/60">
             Disclaimer: Outputs are AI-generated and for informational purposes only; not legal advice.
@@ -296,6 +376,9 @@ Date: ___________________________
             value={result}
             onChange={(e) => setResult(e.target.value)}
           />
+          <p className="text-xs text-white/50">
+            Tip: Try roles like “Family Solicitor”, set Sector to “Legal Services”, Seniority “Senior”, Pattern “Hybrid”, and add a note like “legal aid matters; children law; advocacy”.
+          </p>
         </div>
       </form>
     </div>
