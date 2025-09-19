@@ -5,11 +5,11 @@ import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates"
 type Params = { slug: string };
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const tpl = TEMPLATES_BY_SLUG[params.slug];
-  if (!tpl) return {};
+  const t = TEMPLATES_BY_SLUG[params.slug];
+  if (!t) return {};
   return {
-    title: `${tpl.title} — Template`,
-    description: tpl.summary
+    title: `${t.title} — Free Template`,
+    description: t.summary, // <-- use summary, not excerpt
   };
 }
 
