@@ -2,8 +2,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-saas-starter.vercel.app";
 
@@ -15,10 +14,7 @@ export const metadata: Metadata = {
   },
   description:
     "Generate, edit, and e-sign documents with an AI copilot. Start free, then upgrade for advanced features and unlimited storage.",
-  alternates: {
-    canonical: "/",
-    sitemap: "/sitemap.xml",
-  },
+  alternates: { canonical: "/", sitemap: "/sitemap.xml" },
   openGraph: {
     type: "website",
     url: SITE_URL,
@@ -74,8 +70,6 @@ export default function RootLayout({
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-6 py-10">{children}</main>
-        <Analytics />
-<SpeedInsights />
       </body>
     </html>
   );
