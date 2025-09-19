@@ -74,6 +74,8 @@ export default function RootLayout({
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-6 py-10">{children}</main>
+        <Analytics />
+<SpeedInsights />
       </body>
     </html>
   );
