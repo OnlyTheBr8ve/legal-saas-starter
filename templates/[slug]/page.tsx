@@ -1,76 +1,39 @@
-// app/templates/[slug]/page.tsx
-import { notFound } from "next/navigation";
-import Link from "next/link";
+// templates/[slug]/page.tsx
 import type { Metadata } from "next";
-import { TEMPLATES } from "@/lib/templates";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { TEMPLATES, TEMPLATES_BY_SLUG } from "@/lib/templates";
 
+// Ensure Next knows the param shape
 type Params = { slug: string };
 
 export async function generateMetadata(
   { params }: { params: Params }
 ): Promise<Metadata> {
-  const t = TEMPLATES[params.slug];
+  const t = TEMPLATES_BY_SLUG[params.slug];
   if (!t) return {};
-  const title = `${t.title} — Free Template`;
-  const description = t.excerpt;
-  const url = `/templates/${t.slug}`;
   return {
-    title,
-    description,
-    alternates: { canonical: url },
-    openGraph: {
-      title,
-      description,
-      url,
-      type: "article"
-    }
+    title: `${t.title} — Free Template`,
+    description: t.excerpt,
   };
 }
 
 export default function TemplatePage({ params }: { params: Params }) {
-  const t = TEMPLATES[params.slug];
+  const t = TEMPLATES_BY_SLUG[params.slug];
   if (!t) return notFound();
 
-  const prefillHref = `/dashboard?prompt=${encodeURIComponent(t.prompt)}&template=${encodeURIComponent(t.slug)}`;
+  // Optional: prefill Dashboard's ?prompt= param
+  const prefill = encodeURIComponent(
+    [
+      `Template: ${t.title}`,
+      `Jurisdiction: UK`,
+      `Purpose: ${t.excerpt}`,
+      ``,
+      `Please generate a professional first draft with headings, numbered clauses,`,
+      `placeholders in {{double_curly}}, and a short cover summary.`,
+    ].join("\n")
+  );
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10 space-y-8">
-      <div className="space-y-3">
-        <h1 className="text-4xl font-extrabold">{t.title}</h1>
-        <p className="text-white/70">{t.excerpt}</p>
-      </div>
-
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
-        <h2 className="text-xl font-semibold">What you’ll get</h2>
-        <ul className="list-disc ml-6 space-y-1 text-white/80">
-          <li>Structured, editable draft in seconds</li>
-          <li>Export / copy and continue editing</li>
-          <li>Works with the free plan (short docs)</li>
-        </ul>
-        <div className="flex gap-3 pt-2">
-          <Link
-            href={prefillHref}
-            className="inline-flex items-center rounded-xl bg-violet-500 px-5 py-3 font-semibold hover:bg-violet-400"
-          >
-            Generate this document
-          </Link>
-          <Link
-            href="/templates"
-            className="inline-flex items-center rounded-xl border border-white/15 px-5 py-3 hover:bg-white/5"
-          >
-            Back to templates
-          </Link>
-        </div>
-      </div>
-
-      <section className="prose prose-invert max-w-none">
-        <h2>How it works</h2>
-        <ol>
-          <li>Click <b>Generate this document</b>.</li>
-          <li>The dashboard opens with a pre-filled prompt.</li>
-          <li>Review, tweak anything, and export.</li>
-        </ol>
-      </section>
-    </main>
-  );
-}
+    <main className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+     
