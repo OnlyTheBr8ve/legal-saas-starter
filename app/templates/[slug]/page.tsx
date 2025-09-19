@@ -4,26 +4,28 @@ import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates"
 
 type Params = { slug: string };
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+// Build <head> tags
+export async function generateMetadata(
+  { params }: { params: Params }
+): Promise<Metadata> {
   const t = TEMPLATES_BY_SLUG[params.slug];
   if (!t) return {};
   return {
     title: `${t.title} — Free Template`,
-    description: t.summary, // <-- use summary, not excerpt
+    description: t.summary, // ← was excerpt
   };
 }
 
 export default function TemplateDetailPage({ params }: { params: Params }) {
   const tpl: TemplateDef | undefined = TEMPLATES_BY_SLUG[params.slug];
+
   if (!tpl) {
     return (
       <main className="max-w-3xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold">Template not found</h1>
         <p className="text-white/70 mt-2">
           We couldn’t find that template.{" "}
-          <Link href="/templates" className="underline">
-            Back to Templates
-          </Link>
+          <Link href="/templates" className="underline">Back to Templates</Link>
         </p>
       </main>
     );
@@ -43,7 +45,10 @@ export default function TemplateDetailPage({ params }: { params: Params }) {
 
       <div className="flex flex-wrap gap-2">
         {tpl.sectors.map((s) => (
-          <span key={s} className="text-xs rounded bg-white/10 px-2 py-0.5 border border-white/10">
+          <span
+            key={s}
+            className="text-xs rounded bg-white/10 px-2 py-0.5 border border-white/10"
+          >
             {s}
           </span>
         ))}
@@ -51,7 +56,9 @@ export default function TemplateDetailPage({ params }: { params: Params }) {
 
       <div className="rounded-md bg-black/20 border border-white/10 p-4">
         <h3 className="font-semibold mb-2">Example prompt</h3>
-        <pre className="whitespace-pre-wrap text-sm text-white/80">{tpl.examplePrompt}</pre>
+        <pre className="whitespace-pre-wrap text-sm text-white/80">
+          {tpl.examplePrompt}
+        </pre>
       </div>
 
       <div className="flex gap-3">
