@@ -1,28 +1,27 @@
-// app/dashboard/page.tsx
 "use client";
+
+export const dynamic = "force-dynamic"; // <-- prevents prerender errors with useSearchParams
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-const FULL_DRAFT_PRIMER = `Draft a complete, professional contract in Markdown. 
+const FULL_DRAFT_PRIMER = `Draft a complete, professional contract in Markdown.
 If details are missing, use [placeholders]. Include a Schedule of Key Terms.`;
 
 export default function DashboardPage() {
   const params = useSearchParams();
   const prefill = params.get("prompt") || "";
   const [prompt, setPrompt] = useState(prefill);
-  const [sectorClauses, setSectorClauses] = useState(""); // if you pass from wizard, set here
+  const [sectorClauses, setSectorClauses] = useState("");
   const [out, setOut] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If prompt came from /wizard, you may already include sector clauses in it.
-  // Otherwise, let this stay blank or wire it up from localStorage/state as you prefer.
   useEffect(() => {
     if (prefill && !prompt) setPrompt(prefill);
-  }, [prefill]); // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const finalPrompt = useMemo(() => {
-    // Prepend the primer if the user didn’t paste a base doc (simple heuristic)
     const hasSections = /\b(Definitions|Termination|Governing Law)\b/i.test(prompt);
     return hasSections ? prompt : `${FULL_DRAFT_PRIMER}\n\n${prompt}`;
   }, [prompt]);
@@ -75,7 +74,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* If you want to surface sector clauses to the user, keep this visible; otherwise, hide it or wire from wizard */}
       <div className="space-y-3">
         <label className="block text-sm text-white/70">Sector Clauses (optional)</label>
         <textarea
