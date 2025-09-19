@@ -2,6 +2,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-saas-starter.vercel.app";
