@@ -2,9 +2,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-saas-starter.vercel.app";
@@ -16,22 +13,25 @@ export const metadata: Metadata = {
     template: "%s · ClauseCraft",
   },
   description:
-    "Generate, edit, and e-sign documents with an AI copilot. Start free, then upgrade for advanced features and unlimited storage.",
-  alternates: { canonical: "/", sitemap: "/sitemap.xml" },
+    "Generate, edit, and e-sign SME-friendly documents with an AI copilot. Start free, upgrade for advanced features and unlimited storage.",
+  alternates: {
+    canonical: "/",
+    sitemap: "/sitemap.xml",
+  },
   openGraph: {
     type: "website",
     url: SITE_URL,
     siteName: "ClauseCraft",
     title: "ClauseCraft — AI Contracts & E-Sign for SMEs",
     description:
-      "Generate, edit, and e-sign documents with an AI copilot. Start free, then upgrade for advanced features and unlimited storage.",
+      "Generate, edit, and e-sign SME-friendly documents with an AI copilot.",
     images: [{ url: "/opengraph-image.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "ClauseCraft — AI Contracts & E-Sign for SMEs",
     description:
-      "Generate, edit, and e-sign documents with an AI copilot. Start free, then upgrade for advanced features and unlimited storage.",
+      "Generate, edit, and e-sign SME-friendly documents with an AI copilot.",
     images: ["/opengraph-image.png"],
   },
 };
@@ -43,36 +43,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-screen bg-[#0B0F1A] text-white antialiased">
+      <body className="min-h-screen bg-zinc-950 text-white">
         <header className="border-b border-white/10">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-            <Link href="/" className="text-lg font-semibold">
+          <nav className="mx-auto max-w-5xl flex items-center justify-between p-4">
+            <Link href="/" className="font-semibold tracking-tight">
               ClauseCraft
             </Link>
             <div className="flex items-center gap-6 text-sm">
-              <Link href="/dashboard" className="text-white/80 hover:text-white">
-                Dashboard
-              </Link>
               <Link href="/pricing" className="text-white/80 hover:text-white">
                 Pricing
               </Link>
-              <Link href="/account" className="text-white/80 hover:text-white">
-                Account
+              <Link href="/dashboard" className="text-white/80 hover:text-white">
+                Dashboard
               </Link>
               <Link href="/login" className="text-white/80 hover:text-white">
                 Login
-              </Link>
-              <Link
-                href="/pricing"
-                className="rounded-xl bg-indigo-500 px-4 py-2 font-medium hover:bg-indigo-400"
-              >
-                Upgrade
               </Link>
             </div>
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-6 py-10">{children}</main>
+        <main className="mx-auto max-w-5xl p-4">{children}</main>
+
+        <footer className="mt-16 border-t border-white/10">
+          <div className="mx-auto max-w-5xl p-4 text-xs text-white/60">
+            © {new Date().getFullYear()} ClauseCraft. All rights reserved.
+          </div>
+        </footer>
       </body>
     </html>
   );
