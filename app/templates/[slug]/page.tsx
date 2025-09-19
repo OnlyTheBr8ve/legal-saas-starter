@@ -1,10 +1,11 @@
+// templates/[slug]/page.tsx
 import Link from "next/link";
 import type { Metadata } from "next";
 import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates";
 
 type Params = { slug: string };
 
-// Build <head> tags
+// Build <head> tags for this template page
 export async function generateMetadata(
   { params }: { params: Params }
 ): Promise<Metadata> {
@@ -12,7 +13,7 @@ export async function generateMetadata(
   if (!t) return {};
   return {
     title: `${t.title} — Free Template`,
-    description: t.summary, // ← was excerpt
+    description: t.summary, // <- was excerpt
   };
 }
 
@@ -77,4 +78,9 @@ export default function TemplateDetailPage({ params }: { params: Params }) {
       </div>
     </main>
   );
+}
+
+// (Optional but nice) let Next prebuild these pages
+export function generateStaticParams() {
+  return TEMPLATES.map((t) => ({ slug: t.slug }));
 }
