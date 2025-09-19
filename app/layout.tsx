@@ -16,7 +16,6 @@ export const metadata: Metadata = {
     "Generate, edit, and e-sign SME-friendly documents with an AI copilot. Start free, upgrade for advanced features and unlimited storage.",
   alternates: {
     canonical: "/",
-    sitemap: "/sitemap.xml",
   },
   openGraph: {
     type: "website",
