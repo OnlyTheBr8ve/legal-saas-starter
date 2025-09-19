@@ -2,14 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates";
 
-// Ensure Next knows the param shape
 type Params = { slug: string };
 
-export async function generateMetadata({
-  params
-}: {
-  params: Params;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const tpl = TEMPLATES_BY_SLUG[params.slug];
   if (!tpl) return {};
   return {
@@ -21,7 +16,6 @@ export async function generateMetadata({
 export default function TemplateDetailPage({ params }: { params: Params }) {
   const tpl: TemplateDef | undefined = TEMPLATES_BY_SLUG[params.slug];
   if (!tpl) {
-    // Not found – let Next handle the 404
     return (
       <main className="max-w-3xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold">Template not found</h1>
