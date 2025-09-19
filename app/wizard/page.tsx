@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates";
 
 // Ensure Next knows the param shape
-type Params = { slug: string };
+type Params = { slug: string };a
 
 export async function generateMetadata({
   params
