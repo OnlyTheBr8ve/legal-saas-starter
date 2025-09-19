@@ -1,30 +1,45 @@
-export type Template = {
+// lib/templates.ts
+
+export type TemplateDef = {
   slug: string;
   title: string;
-  summary: string;
-  examplePrompt: string;
+  excerpt: string;
 };
 
-export const TEMPLATES: Template[] = [
+export const TEMPLATES: TemplateDef[] = [
   {
     slug: "uk-employment-contract",
-    title: "UK Employment Contract",
-    summary: "Permanent employee agreement with key terms schedule.",
-    examplePrompt:
-      "Role: Bar Supervisor. Full-time. Location: Manchester, UK. Pay: £28,000 + tips. Hours: 40/wk incl. evenings/weekends. Personal licence holder preferred. Probation 3 months.",
+    title: "UK Employment Contract (Hospitality)",
+    excerpt:
+      "Employer/employee terms, pay, hours, probation, termination. Hospitality-focused version.",
   },
   {
     slug: "uk-nda",
-    title: "UK Mutual NDA",
-    summary: "Mutual confidentiality agreement for exploring cooperation.",
-    examplePrompt:
-      "Parties: ClauseCraft Ltd and VendorCo. Purpose: evaluating software partnership. Term: 3 years. Jurisdiction: England and Wales.",
+    title: "UK Non-Disclosure Agreement (Mutual)",
+    excerpt:
+      "Mutual NDA for sharing confidential information with partners and vendors.",
   },
   {
     slug: "uk-freelancer-agreement",
-    title: "UK Freelancer / Contractor",
-    summary: "SOW-based engagement with IP assignment and IR35-friendly terms.",
-    examplePrompt:
-      "Service: Frontend dev on Next.js. Fees: £400/day. Term: 3 months. Deliverables: marketing site build. Location: remote UK.",
+    title: "UK Freelancer / Contractor Agreement",
+    excerpt:
+      "Scope of work, IP assignment, milestones, confidentiality, payment terms.",
+  },
+  {
+    slug: "uk-privacy-policy",
+    title: "UK Website Privacy Policy",
+    excerpt:
+      "Plain-English GDPR-compliant privacy statement for a typical UK SME website.",
+  },
+  {
+    slug: "uk-employee-handbook",
+    title: "UK Employee Handbook (Starter)",
+    excerpt:
+      "Conduct, leave, grievance, data protection, health & safety — starter pack.",
   },
 ];
+
+// String-keyed lookup to avoid TS ‘index expression not of type number’ errors
+export const TEMPLATES_BY_SLUG: Record<string, TemplateDef> = Object.fromEntries(
+  TEMPLATES.map((t) => [t.slug, t])
+);
