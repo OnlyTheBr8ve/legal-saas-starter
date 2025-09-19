@@ -1,28 +1,30 @@
-import Link from "next/link";
-import { TEMPLATES } from "@/lib/templates";
+export type Template = {
+  slug: string;
+  title: string;
+  summary: string;
+  examplePrompt: string;
+};
 
-export const metadata = { title: "Templates" };
-
-export default function TemplatesPage() {
-  return (
-    <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-      <h1 className="text-4xl font-extrabold">Legal Templates</h1>
-      <div className="grid md:grid-cols-2 gap-6">
-        {TEMPLATES.map((t) => (
-          <div key={t.slug} className="rounded-xl border border-white/10 p-5 bg-black/20">
-            <h2 className="text-xl font-semibold">{t.title}</h2>
-            <p className="text-white/70 mt-1">{t.summary}</p>
-            <div className="mt-4">
-              <Link
-                className="text-violet-300 hover:text-violet-200"
-                href={`/templates/${t.slug}`}
-              >
-                Open template →
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-    </main>
-  );
-}
+export const TEMPLATES: Template[] = [
+  {
+    slug: "uk-employment-contract",
+    title: "UK Employment Contract",
+    summary: "Permanent employee agreement with key terms schedule.",
+    examplePrompt:
+      "Role: Bar Supervisor. Full-time. Location: Manchester, UK. Pay: £28,000 + tips. Hours: 40/wk incl. evenings/weekends. Personal licence holder preferred. Probation 3 months.",
+  },
+  {
+    slug: "uk-nda",
+    title: "UK Mutual NDA",
+    summary: "Mutual confidentiality agreement for exploring cooperation.",
+    examplePrompt:
+      "Parties: ClauseCraft Ltd and VendorCo. Purpose: evaluating software partnership. Term: 3 years. Jurisdiction: England and Wales.",
+  },
+  {
+    slug: "uk-freelancer-agreement",
+    title: "UK Freelancer / Contractor",
+    summary: "SOW-based engagement with IP assignment and IR35-friendly terms.",
+    examplePrompt:
+      "Service: Frontend dev on Next.js. Fees: £400/day. Term: 3 months. Deliverables: marketing site build. Location: remote UK.",
+  },
+];
