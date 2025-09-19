@@ -1,130 +1,97 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import {
+  Sector,
+  SECTOR_PACKS,
+  getSectorPack,
+  bullet,
+  ToggleKey,
+} from '@/lib/sector-config';
 
 type Detail = 'basic' | 'comprehensive';
-type Sector =
-  | 'Hospitality'
-  | 'Legal Services'
-  | 'Retail'
-  | 'Construction'
-  | 'Healthcare'
-  | 'Technology'
-  | 'Other';
-
 type EmpType = 'Full-time' | 'Part-time' | 'Zero-hours' | 'Fixed-term' | 'Casual';
 type WorkingPattern = 'On-site' | 'Hybrid' | 'Remote' | 'Shift / Rota' | 'Night work';
 
-const SECTOR_CLAUSE_PACKS: Record<Sector, string[]> = {
-  Hospitality: [
-    'Customer service standards and expected conduct',
-    'Age-restricted sales: alcohol/licensing compliance and refusal log procedures',
-    'Food hygiene: HACCP awareness, allergen handling, cross-contamination avoidance',
-    'Tips & tronc policy; card tips distribution; cash handling and reconciliation',
-    'Uniform & personal appearance; health & safety in bar/restaurant environments',
-    'Incident reporting: spills, breakages, aggression, ID challenges',
-  ],
-  'Legal Services': [
-    'SRA/Legal regulator duties: integrity, client care, conflicts, confidentiality',
-    'Client money & accounts rules; billing/time recording accuracy',
-    'Professional indemnity and supervision; reserved legal activities',
-    'Data protection and legal professional privilege; secure storage/transfer',
-    'Matter opening/closing, file management, retention and archiving',
-  ],
-  Retail: [
-    'Customer service standards; complaints escalation',
-    'Age-restricted sales (e.g., tobacco, knives) checks and refusals',
-    'Stock handling, shrinkage prevention, CCTV and bag-check policy',
-    'Till operations, refunds/exchanges, cashing up',
-    'Manual handling and in-store H&S procedures',
-  ],
-  Construction: [
-    'Site induction; CDM awareness; method statements and risk assessments',
-    'Mandatory PPE usage; plant & tools competence',
-    'Permit-to-work controls; hot works; working at height',
-    'Reporting near-misses, incidents, and unsafe conditions',
-    'Drug & alcohol testing; fitness for duty',
-  ],
-  Healthcare: [
-    'Clinical governance; duty of candour; safeguarding (children/vulnerable adults)',
-    'Infection prevention & control; vaccinations; sharps policy',
-    'Confidentiality (patient data) and records; GDPR/UK-DPA compliance',
-    'Professional registration and revalidation (where applicable)',
-    'On-call, night work, handover, escalation protocols',
-  ],
-  Technology: [
-    'Information security: access controls, secrets handling, device and BYOD policy',
-    'Secure development lifecycle; code review; vulnerability disclosure',
-    'Data protection; customer data handling; logging/monitoring',
-    'Open-source licensing, IP assignment, and contribution policy',
-    'Incident response, uptime/on-call expectations (if applicable)',
-  ],
-  Other: [
-    'Role-specific duties section tailored to the job and industry',
-    'Applicable regulatory/compliance obligations',
-    'Risk and safety practices relevant to the work environment',
-  ],
-};
-
 export default function WizardPage() {
-  // --- Core identity fields ---
+  // Identity
   const [employer, setEmployer] = useState('Example Ltd');
   const [employee, setEmployee] = useState('Jordan Doe');
-  const [role, setRole] = useState('Bar Staff'); // try changing to "Family Solicitor" etc.
+  const [role, setRole] = useState('Bar Staff');
   const [startDate, setStartDate] = useState('2025-10-01');
   const [jurisdiction, setJurisdiction] = useState('UK');
 
-  // --- Pay / Hours ---
+  // Pay / Hours
   const [pay, setPay] = useState('£12.50 per hour, paid weekly');
   const [hours, setHours] = useState('20–30 hours per week, rota-based');
 
-  // --- Specificity controls ---
+  // Specificity
   const [sector, setSector] = useState<Sector>('Hospitality');
   const [seniority, setSeniority] = useState('Staff');
   const [employmentType, setEmploymentType] = useState<EmpType>('Part-time');
   const [pattern, setPattern] = useState<WorkingPattern>('Shift / Rota');
   const [detail, setDetail] = useState<Detail>('comprehensive');
-  const [notes, setNotes] = useState(''); // optional regulatory or client notes
+  const [notes, setNotes] = useState('');
 
-  // --- Instructions scaffold ---
-  const baseInstructions =
-    'Write a clean, well-structured employment contract in Markdown with clear H1/H2/H3 headings, numbered clauses, and bullet points where helpful. Use plain English suitable for SMEs. Keep it practical, not academic. Include a signature section.';
+  // Dynamic sector toggles
+  const pack = useMemo(() => getSectorPack(sector), [sector]);
+  const [answers, setAnswers] = useState<Record<ToggleKey, boolean>>({} as any);
 
-  // Computed clause pack text
-  const selectedClausePack = useMemo(() => {
-    const packs = SECTOR_CLAUSE_PACKS[sector] || [];
-    const list = packs.map((p) => `- ${p}`).join('\n');
-    return list
-      ? `\n\n**Sector-specific clause requirements (must be included):**\n${list}\n`
+  function toggleAnswer(key: ToggleKey, next?: boolean) {
+    setAnswers((prev) => ({ ...prev, [key]: next ?? !prev[key] }));
+  }
+
+  // Build sector-specific “must include” bullets
+  const sectorMustInclude = useMemo(() => {
+    const base = pack.baseClauses.length
+      ? `**Sector-specific base requirements (include all):**\n${bullet(pack.baseClauses)}\n`
       : '';
-  }, [sector]);
+
+    const selectedKeys = Object.entries(answers)
+      .filter(([k, v]) => v)
+      .map(([k]) => k as ToggleKey);
+
+    const extraClauses: string[] = [];
+    for (const key of selectedKeys) {
+      const add = pack.clauseByToggle[key];
+      if (add && add.length) extraClauses.push(...add);
+    }
+
+    const extra = extraClauses.length
+      ? `\n**Selected conditions (must be reflected as binding clauses):**\n${bullet(extraClauses)}\n`
+      : '';
+
+    return `${base}${extra}`.trim();
+  }, [pack, answers]);
+
+  // Instructions
+  const baseInstructions =
+    'Write a well-structured employment contract in Markdown (H1/H2/H3, numbered clauses, bullets). Plain English for SMEs. Include signature blocks. Avoid generic boilerplate; be specific to the role and sector.';
 
   function composeInstructions() {
     const levelNote =
       detail === 'comprehensive'
-        ? 'Ensure a full professional contract (12–18 sections), with complete, role- and sector-specific clauses. Avoid generic boilerplate.'
-        : 'Keep the document concise but complete (8–10 sections), still tailored to the role and sector.';
+        ? 'Produce a comprehensive contract with 12–18 sections. Tailor everything to the role, sector, seniority, and working pattern.'
+        : 'Produce a concise but complete contract with ~8–10 sections, still tailored to the role and sector.';
 
     const jHint =
       jurisdiction.toUpperCase().startsWith('UK')
-        ? 'Follow UK norms (statutory holidays, SSP, clear plain English). Avoid US-specific concepts unless universal.'
-        : 'Follow the norms of the specified jurisdiction and avoid irrelevant foreign concepts.';
+        ? 'Follow UK norms (statutory holidays, SSP, plain English). Avoid US-only concepts.'
+        : 'Follow norms applicable to the named jurisdiction and avoid irrelevant foreign concepts.';
 
-    // Enforce role specificity:
     const roleDirectives = `
-**Role specificity requirements (must do):**
-- Add a section titled "Role-Specific Duties" with at least 8 concise bullet points tailored to the exact role **"${role}"**, considering **${sector}** and **${seniority}** seniority.
-- Add a section "Regulatory & Compliance" covering obligations that actually apply in **${sector}** within **${jurisdiction}**.
-- Add a section "Risk, Safety & Conduct" reflecting hazards/controls relevant to **${pattern}** work and the sector.
-- Adapt working time, breaks, on-call/night work, and overtime expectations to **${employmentType}** and **${pattern}**.
-- Avoid filler language; prefer precise, practical obligations and processes.
-${selectedClausePack}
+**Role-specific requirements:**
+- Add "Role-Specific Duties" (≥8 bullets) tailored to "${role}" in ${sector} at ${seniority} level.
+- Add "Regulatory & Compliance" that actually applies in ${sector} within ${jurisdiction}.
+- Add "Risk, Safety & Conduct" reflecting hazards for ${pattern} work and this sector.
+- Adapt working time, breaks, and overtime to ${employmentType} / ${pattern}.
+${sectorMustInclude ? `\n${sectorMustInclude}\n` : ''}
 ${notes ? `\n**Additional context from user:** ${notes}\n` : ''}`.trim();
 
     return `${baseInstructions}\n${levelNote}\n${jHint}\n\n${roleDirectives}`;
   }
 
-  // Template — still filled server-side first (variables), then rewritten by AI using instructions.
+  // Base template with variables
   const baseTemplate = `# Employment Agreement
 
 This Employment Agreement (“Agreement”) is made between **{{employer_name}}** (“Employer”) and **{{employee_name}}** (“Employee”) for the role of **{{job_title}}**, starting on **{{start_date}}**.
@@ -235,7 +202,7 @@ Date: ___________________________
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           template: baseTemplate,
-          variables, // server does {{...}} replacement first
+          variables,
           instructions: composeInstructions(),
           jurisdiction,
         }),
@@ -256,12 +223,18 @@ Date: ___________________________
     }
   }
 
+  // Pattern-aware rendering (some toggles only make sense on certain patterns)
+  function shouldShowToggle(dep?: SectorQuestion['dependsOnPattern']) {
+    if (!dep || dep.length === 0) return true;
+    return dep.includes(pattern);
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Contract Wizard</h1>
         <p className="text-white/70 mt-1">
-          Fill the form and generate a contract that matches the role, sector, and working pattern. Outputs are in Markdown (ready to copy/export).
+          Pick a sector, answer smart prompts, and generate a contract tailored to the role and working pattern.
         </p>
       </div>
 
@@ -297,8 +270,19 @@ Date: ___________________________
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Sector</label>
-              <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={sector} onChange={(e) => setSector(e.target.value as Sector)}>
-                {(['Hospitality','Legal Services','Retail','Construction','Healthcare','Technology','Other'] as Sector[]).map(s => <option key={s} value={s}>{s}</option>)}
+              <select
+                className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2"
+                value={sector}
+                onChange={(e) => {
+                  setSector(e.target.value as Sector);
+                  setAnswers({} as any);
+                }}
+              >
+                {SECTOR_PACKS.map((p) => (
+                  <option key={p.sector} value={p.sector}>
+                    {p.sector}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -317,16 +301,50 @@ Date: ___________________________
             <div>
               <label className="block text-sm text-white/70 mb-1">Employment Type</label>
               <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={employmentType} onChange={(e) => setEmploymentType(e.target.value as EmpType)}>
-                {(['Full-time','Part-time','Zero-hours','Fixed-term','Casual'] as EmpType[]).map(t => <option key={t} value={t}>{t}</option>)}
+                {(['Full-time', 'Part-time', 'Zero-hours', 'Fixed-term', 'Casual'] as EmpType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Working Pattern</label>
               <select className="w-full rounded-lg bg-zinc-900 border border-white/10 px-3 py-2" value={pattern} onChange={(e) => setPattern(e.target.value as WorkingPattern)}>
-                {(['On-site','Hybrid','Remote','Shift / Rota','Night work'] as WorkingPattern[]).map(p => <option key={p} value={p}>{p}</option>)}
+                {(['On-site', 'Hybrid', 'Remote', 'Shift / Rota', 'Night work'] as WorkingPattern[]).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+
+          {/* Smart, sector-specific prompts */}
+          {pack.questions.length > 0 && (
+            <div className="rounded-xl border border-white/10 p-4 space-y-3 bg-zinc-900/40">
+              <div className="text-sm font-semibold">Sector considerations</div>
+              {pack.questions.map((q) =>
+                shouldShowToggle(q.dependsOnPattern) ? (
+                  <label key={q.key} className="flex items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={!!answers[q.key]}
+                      onChange={(e) => toggleAnswer(q.key, e.target.checked)}
+                    />
+                    <span>
+                      {q.label}
+                      {q.help && <span className="text-white/60"> — {q.help}</span>}
+                    </span>
+                  </label>
+                ) : null
+              )}
+              <p className="text-xs text-white/50">
+                These toggles add binding clauses to the contract (e.g., licence or training as a condition).
+              </p>
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -362,10 +380,7 @@ Date: ___________________________
           </button>
 
           {err && <p className="text-sm text-red-400">{err}</p>}
-
-          <p className="text-xs text-white/60">
-            Disclaimer: Outputs are AI-generated and for informational purposes only; not legal advice.
-          </p>
+          <p className="text-xs text-white/60">Disclaimer: Outputs are AI-generated and for informational purposes only; not legal advice.</p>
         </div>
 
         {/* RIGHT: result */}
@@ -377,10 +392,13 @@ Date: ___________________________
             onChange={(e) => setResult(e.target.value)}
           />
           <p className="text-xs text-white/50">
-            Tip: Try roles like “Family Solicitor”, set Sector to “Legal Services”, Seniority “Senior”, Pattern “Hybrid”, and add a note like “legal aid matters; children law; advocacy”.
+            Tip: The more specific you are (toggles + notes), the more tailored the contract will be.
           </p>
         </div>
       </form>
     </div>
   );
 }
+
+// local helper for type
+type SectorQuestion = ReturnType<typeof getSectorPack>['questions'][number];
