@@ -17,6 +17,13 @@ export const TEMPLATES: TemplateDef[] = [
       "Draft a UK employment contract for a full‑time Bar Supervisor in London. Salary £30,000, 40 hours, rota incl. weekends, probation 3 months, notice 2 weeks. Requires Personal Licence; loss of licence triggers review. Uniform provided; tronc/tips handled via PAYE. Include GDPR and health & safety clauses."
   },
   {
+  slug: "uk-consultancy-agreement",
+  title: "UK Consultancy Agreement",
+  summary: "Scope, milestones, payment, IP and confidentiality for consultants.",
+  sectors: ["Tech", "Finance"],
+  examplePrompt: "Draft a UK consultancy agreement for data strategy work…"
+}
+  {
     slug: "uk-nda",
     title: "UK Mutual NDA",
     summary:
