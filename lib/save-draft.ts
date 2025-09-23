@@ -1,94 +1,89 @@
 // lib/save-draft.ts
 
-export type Draft = {
-  id: string;
+// Keep this file platform-agnostic (works on server and client).
+// Local persistence uses localStorage guarded behind `typeof window !== "undefined"`.
+
+export type DraftItem = {
+  id: string;              // uuid or timestamp id
   title: string;
+  sector?: string;         // keep as string to avoid imports/cycles
   content: string;
-  sector?: string;
-  createdAt: string; // ISO
-  updatedAt: string; // ISO
+  tags?: string[];
+  createdAt: number;       // epoch ms
+  updatedAt: number;       // epoch ms
 };
 
-const STORAGE_KEY = "drafts:v1";
+const LS_KEY = "cc__drafts_v1";
 
-function load(): Draft[] {
+// ---------- Local (browser) helpers ----------
+
+function safeReadAll(): DraftItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(LS_KEY);
     if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? (arr as Draft[]) : [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // very light validation
+    return parsed.filter((d) => d && typeof d.id === "string" && typeof d.content === "string");
   } catch {
     return [];
   }
 }
 
-function save(drafts: Draft[]) {
+function safeWriteAll(list: DraftItem[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+  try {
+    window.localStorage.setItem(LS_KEY, JSON.stringify(list));
+  } catch {
+    // ignore quota errors etc.
+  }
 }
 
-/**
- * Write (upsert) a draft to localStorage.
- * Returns the saved Draft.
- */
-export function writeLocalDraft(input: {
-  id?: string;
-  title?: string;
-  content: string;
-  sector?: string;
-}): Draft {
-  const now = new Date().toISOString();
-  const id = input.id ?? (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`);
-  const nextDraft: Draft = {
-    id,
-    title: input.title?.trim() || "Untitled",
-    content: input.content,
-    sector: input.sector,
-    createdAt: now,
+/** Read all drafts from localStorage (client only). */
+export function readLocalDrafts(): DraftItem[] {
+  return safeReadAll().sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** Read a single draft by id (client only). */
+export function readLocalDraft(id: string): DraftItem | undefined {
+  return safeReadAll().find((d) => d.id === id);
+}
+
+/** Create or update a draft in localStorage (client only). */
+export function writeLocalDraft(draft: DraftItem): DraftItem {
+  const list = safeReadAll();
+  const now = Date.now();
+  const idx = list.findIndex((d) => d.id === draft.id);
+
+  const toSave: DraftItem = {
+    ...draft,
+    createdAt: idx >= 0 ? list[idx].createdAt : draft.createdAt ?? now,
     updatedAt: now,
   };
 
-  const drafts = load();
-  const idx = drafts.findIndex((d) => d.id === id);
-  if (idx >= 0) {
-    drafts[idx] = { ...drafts[idx], ...nextDraft, createdAt: drafts[idx].createdAt, updatedAt: now };
-  } else {
-    drafts.unshift(nextDraft);
-  }
-  save(drafts);
-  // broadcast to other tabs
-  try {
-    localStorage.setItem(`${STORAGE_KEY}:touch`, now);
-  } catch {}
-  return idx >= 0 ? drafts[idx] : nextDraft;
+  if (idx >= 0) list[idx] = toSave;
+  else list.unshift(toSave);
+
+  safeWriteAll(list);
+  return toSave;
 }
 
-export function readLocalDrafts(): Draft[] {
-  return load();
+/** Delete a draft from localStorage (client only). */
+export function deleteLocalDraft(id: string): void {
+  const list = safeReadAll().filter((d) => d.id !== id);
+  safeWriteAll(list);
 }
 
-export function deleteLocalDraft(id: string) {
-  const drafts = load().filter((d) => d.id !== id);
-  save(drafts);
-}
-
-export function clearLocalDrafts() {
-  save([]);
-}
+// ---------- Server-side placeholder (API-compatible) ----------
+// On Vercel without a DB, we provide a noop server save that simply echoes success.
+// Later we can swap this to Supabase/DB/KV without touching callers.
 
 /**
- * Optional helper to call the API (no-op server persistence for now).
- * We won't import this on the server—client-only convenience.
+ * Server-safe placeholder save. Does not persist on the server.
+ * Keep the signature stable so API route code can call it.
  */
-export async function postDraftToApi(draft: { id?: string; title?: string; content: string; sector?: string }) {
-  try {
-    await fetch("/api/save-draft", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(draft),
-    });
-  } catch {
-    // ignore network errors; local save already succeeded
-  }
+export async function saveDraft(draft: DraftItem): Promise<{ ok: true }> {
+  // In the future, persist to DB/KV here.
+  return { ok: true };
 }
