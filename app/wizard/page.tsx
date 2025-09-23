@@ -10,9 +10,13 @@ import {
   type SectorKey,
 } from "@/lib/sector-config";
 
-// Opt out of SSG/ISR to avoid prerender errors with searchParams.
+/**
+ * Important: Avoid prerender and any cache weirdness.
+ * - dynamic: force runtime render
+ * - revalidate: false (must be boolean or a positive number)
+ */
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = false;
 
 export default function WizardPage() {
   return (
@@ -26,7 +30,6 @@ function WizardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Prefill from query if present
   const prefillRole = searchParams.get("role") ?? "";
   const prefillSector = (searchParams.get("sector") as SectorKey | null) ?? "general";
 
@@ -66,7 +69,6 @@ function WizardInner() {
       lines.push(`Additional instructions: ${notes.trim()}`);
     }
 
-    // A short “style” brief to raise quality
     lines.push(
       "Format with clear section headings, numbered clauses, and bullet points where helpful. Start with Parties, Role & Duties, Place of Work, Hours, Pay, Benefits, Holiday, Probation (if applicable), Training/Qualifications, Confidentiality & IP, Health & Safety, Equality & Conduct, Data Protection, Termination, Notice, Post-termination (if applicable). Use plain English suitable for UK SMEs."
     );
@@ -77,8 +79,7 @@ function WizardInner() {
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     const prompt = buildPrompt();
-    const url = `/dashboard?prompt=${encodeURIComponent(prompt)}`;
-    router.push(url);
+    router.push(`/dashboard?prompt=${encodeURIComponent(prompt)}`);
   }
 
   return (
@@ -92,7 +93,6 @@ function WizardInner() {
       </header>
 
       <form onSubmit={handleGenerate} className="space-y-6">
-        {/* Sector */}
         <div>
           <label className="block mb-2 font-medium">Sector</label>
           <select
@@ -108,7 +108,6 @@ function WizardInner() {
           </select>
         </div>
 
-        {/* Role basics */}
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block mb-2 font-medium">Role title</label>
@@ -135,7 +134,6 @@ function WizardInner() {
           </div>
         </div>
 
-        {/* Details */}
         <div className="grid md:grid-cols-3 gap-4">
           <div>
             <label className="block mb-2 font-medium">Location</label>
@@ -166,7 +164,6 @@ function WizardInner() {
           </div>
         </div>
 
-        {/* Sector prompts */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="font-medium">Sector prompts</label>
@@ -194,7 +191,6 @@ function WizardInner() {
           </div>
         </div>
 
-        {/* Extra notes */}
         <div>
           <label className="block mb-2 font-medium">Anything else?</label>
           <textarea
