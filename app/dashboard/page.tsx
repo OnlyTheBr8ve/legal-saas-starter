@@ -8,7 +8,11 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import SaveDraftButton from "@/components/SaveDraftButton";
 import { SECTORS, type SectorKey } from "@/lib/sector-config";
-import DraftLibraryPanel, { DraftItem, writeLocalDraft } from "@/components/DraftLibraryPanel";
+import DraftLibraryPanel from "@/components/DraftLibraryPanel";
+import type { DraftItem } from "@/lib/save-draft";
+// If you actually call writeLocalDraft in this file, import it from the lib too:
+// import { writeLocalDraft } from "@/lib/save-draft";
+
 
 type GenResponse = { text?: string; error?: string };
 const GENERATE_API = "/api/generate";
