@@ -7,7 +7,6 @@ import { SECTORS, SECTOR_QUESTIONS } from "@/lib/sector-config";
 // ---- helpers ----
 function resolveSectorLabel(sector: string | null | undefined): string {
   if (!sector) return "";
-  // Handle both array-of-options and record maps
   if (Array.isArray(SECTORS)) {
     const found = (SECTORS as Array<Record<string, unknown>>).find((o) => {
       const key =
@@ -39,10 +38,8 @@ function normalizeQuestions(sector: string | undefined): string[] {
   const map = (SECTOR_QUESTIONS ?? {}) as Record<string, unknown>;
   const bucket = map[sector];
   if (!Array.isArray(bucket)) return [];
-
   return (bucket as Array<Record<string, unknown>>)
     .map((q) => {
-      // Accept label | name | question as the display text
       const text =
         (q.label as string | undefined) ??
         (q.name as string | undefined) ??
@@ -58,7 +55,11 @@ type Props = {
   sector?: string;
   role?: string;
   location?: string;
-  // Optional extra body or intro text from the template page
+  /** Optional descriptive title from the template page */
+  title?: string;
+  /** Optional example/base prompt text from the template page */
+  basePrompt?: string;
+  /** Optional extra intro text */
   intro?: string;
 };
 
@@ -66,6 +67,8 @@ export default function LaunchFromTemplate({
   sector,
   role,
   location,
+  title,
+  basePrompt,
   intro = "",
 }: Props) {
   const sectorLabel = useMemo(() => resolveSectorLabel(sector ?? ""), [sector]);
@@ -81,14 +84,14 @@ export default function LaunchFromTemplate({
 
   const brief = useMemo(() => {
     const lines: string[] = ["# Role Brief"];
+    if (title?.trim()) lines.push(`Template: ${title.trim()}`);
     if (role) lines.push(`Role: ${role}`);
     if (location) lines.push(`Location: ${location}`);
-    if (intro) {
-      lines.push("", intro.trim());
-    }
+    if (intro?.trim()) lines.push("", intro.trim());
+    if (basePrompt?.trim()) lines.push("", "## Base prompt", basePrompt.trim());
     if (sectorNote) lines.push(sectorNote);
     return lines.join("\n");
-  }, [role, location, intro, sectorNote]);
+  }, [title, role, location, intro, basePrompt, sectorNote]);
 
   return (
     <div className="rounded-md border border-white/10 bg-black/30 p-4 space-y-3">
