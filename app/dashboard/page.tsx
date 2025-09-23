@@ -5,16 +5,28 @@ import DraftLibraryPanel from "@/components/DraftLibraryPanel";
 import { SECTORS, type SectorKey } from "@/lib/sector-config";
 
 export default function DashboardPage() {
-  // If you’re pulling sector from a form/router, wire it in here:
+  // If sector comes from router/query/URL, wire that in later.
   const [sector, setSector] = useState<SectorKey | "">("");
 
-  // Correctly map the sector value to a label from the SECTORS array
+  // Helper that is resilient to different SectorOption shapes
   const sectorLabel = useMemo(() => {
     if (!sector) return "";
-    const opt = SECTORS.find(
-      (o: { value: string; label: string }) => o.value === sector
-    );
-    return opt?.label ?? sector;
+
+    // Treat SECTORS as unknown list so we can safely probe keys
+    const list = SECTORS as unknown as Array<Record<string, unknown>>;
+    const found = list.find((o) => {
+      const key =
+        (o?.value as string | undefined) ??
+        (o?.id as string | undefined) ??
+        (o?.slug as string | undefined);
+      return key === sector;
+    });
+
+    const label =
+      (found?.label as string | undefined) ??
+      (found?.name as string | undefined);
+
+    return label ?? sector;
   }, [sector]);
 
   return (
@@ -32,7 +44,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* TEMP sector selector just so you can verify the label mapping works */}
+      {/* TEMP sector selector to verify the label mapping works */}
       <section className="rounded-md border border-white/10 bg-black/30 p-4">
         <label className="block text-sm mb-2">Sector</label>
         <select
@@ -41,11 +53,23 @@ export default function DashboardPage() {
           onChange={(e) => setSector(e.target.value as SectorKey | "")}
         >
           <option value="">— Choose a sector —</option>
-          {SECTORS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
+          {/* Render LABEL flexibly as well */}
+          {(SECTORS as unknown as Array<Record<string, unknown>>).map((s, i) => {
+            const value =
+              (s.value as string | undefined) ??
+              (s.id as string | undefined) ??
+              (s.slug as string | undefined) ??
+              "";
+            const label =
+              (s.label as string | undefined) ??
+              (s.name as string | undefined) ??
+              value;
+            return (
+              <option key={`${value || i}`} value={value}>
+                {label}
+              </option>
+            );
+          })}
         </select>
       </section>
 
