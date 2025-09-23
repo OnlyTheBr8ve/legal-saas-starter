@@ -44,9 +44,12 @@ function DashboardInner() {
   }, []);
 
   const sectorLabel = useMemo(() => {
-    if (!sector) return "";
-    return SECTORS[sector] ?? sector;
-  }, [sector]);
+  if (!sector) return "";
+  // Help TS understand this is a string-keyed map
+  const map = SECTORS as Record<string, string>;
+  return map[sector] ?? sector;
+}, [sector]);
+
 
   async function onGenerate() {
     if (!prompt.trim()) {
