@@ -9,32 +9,30 @@ export default function WizardPage() {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setError(null);
 
-    // ✨ Build your markdown draft here (replace with your real generator if you have one)
-    const markdown = [
-      `# Employment Contract — ${role || "Role"}`,
-      ``,
-      `**Employer:** ${company || "Your Company Ltd"}`,
-      `**Employee:** ___________________________`,
-      ``,
-      `## 1. Start Date`,
-      `The employment will commence on ___/___/____.`,
-      ``,
-      `## 2. Duties`,
-      `The Employee will perform duties reasonably associated with the role of ${role || "the role"}.`,
-      ``,
-      `## 3. Compensation`,
-      `Pay and benefits as agreed.`,
-      ``,
-      `---`,
-      `_Generated via ClauseCraft Wizard_`,
-    ].join("\n");
+    try {
+      const res = await fetch("/api/generate-contract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ role, company }),
+      });
 
-    // ✅ Store + redirect to /dashboard
-    saveDraftAndGo(markdown, "/dashboard");
+      if (!res.ok) {
+        throw new Error(`API error ${res.status}`);
+      }
+
+      const { markdown } = (await res.json()) as { markdown: string };
+      saveDraftAndGo(markdown, "/dashboard");
+    } catch (e: any) {
+      setError(e?.message || "Failed to generate");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -62,6 +60,8 @@ export default function WizardPage() {
           />
         </label>
       </div>
+
+      {error && <p className="text-red-400 text-sm">{error}</p>}
 
       <div className="flex items-center gap-3">
         <button
