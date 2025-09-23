@@ -1,39 +1,71 @@
 "use client";
 
-import { useState } from "react";
-import { postDraftToApi, writeLocalDraft } from "@/lib/save-draft";
+import React, { useState } from "react";
+import { writeLocalDraft, postDraftToApi } from "@/lib/save-draft";
 
 type Props = {
-  getContent: () => string;       // supply current generated/edited text
-  title?: string;                  // optional title
-  sector?: string;                 // optional sector
+  /** The markdown/text to save */
+  content: string;
+  /** Optional display title; if omitted, we derive one */
+  title?: string;
+  /** Optional sector key (used for grouping/filtering) */
+  sector?: string;
+  /** Optional className for the button */
   className?: string;
-  label?: string;
+  /** Optional children; defaults to “Save to Drafts” */
+  children?: React.ReactNode;
 };
 
 export default function SaveDraftButton({
-  getContent,
+  content,
   title,
   sector,
-  className,
-  label = "Save draft",
+  className = "inline-flex items-center rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 border border-white/15",
+  children = "Save to Drafts",
 }: Props) {
   const [saving, setSaving] = useState(false);
 
-  async function onClick() {
-    const content = (getContent?.() ?? "").trim();
-    if (!content) {
-      alert("Nothing to save yet.");
+  function deriveSafeTitle(rawTitle: string | undefined, body: string): string {
+    // Prefer explicit title
+    if (rawTitle && rawTitle.trim().length > 0) return rawTitle.trim();
+
+    // Otherwise, try the first non-empty line of the content (up to 80 chars)
+    const firstLine =
+      body
+        ?.split(/\r?\n/)
+        .map((l) => l.trim())
+        .find((l) => l.length > 0) ?? "";
+
+    if (firstLine.length > 0) return firstLine.slice(0, 80);
+
+    // Final fallback
+    return "Untitled";
+  }
+
+  async function handleSave() {
+    if (!content || content.trim().length === 0) {
+      alert("Nothing to save — the content is empty.");
       return;
     }
+
+    const safeTitle = deriveSafeTitle(title, content);
+
     setSaving(true);
     try {
-      const saved = writeLocalDraft({ content, title, sector });
-      // fire-and-forget API call (currently echo route)
+      // Persist locally (authoritative source for the Drafts panel)
+      const saved = writeLocalDraft({
+        content,
+        title: safeTitle, // now guaranteed string
+        sector, // optional; your lib layer supports this
+      });
+
+      // Fire-and-forget network call (e.g., to echo or real persistence later)
       postDraftToApi(saved).catch(() => {});
+
       alert(`Saved “${saved.title || "Untitled"}” to Drafts.`);
-    } catch (e: any) {
-      alert(`Could not save: ${e?.message ?? "Unknown error"}`);
+    } catch (err) {
+      console.error(err);
+      alert("Sorry, we couldn't save your draft. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -42,11 +74,13 @@ export default function SaveDraftButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleSave}
       disabled={saving}
-      className={className ?? "rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm hover:bg-black/40 disabled:opacity-50"}
+      className={className}
+      aria-busy={saving}
+      title={saving ? "Saving…" : "Save to Drafts"}
     >
-      {saving ? "Saving…" : label}
+      {saving ? "Saving…" : children}
     </button>
   );
 }
