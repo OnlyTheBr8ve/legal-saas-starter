@@ -38,3 +38,7 @@ body {
 .input {
   @apply w-full rounded-xl px-3 py-2 bg-white/5 border border-white/10 text-white placeholder-white/50;
 }
+textarea::placeholder {
+  color: rgb(255 255 255 / 0.4);
+}
+
