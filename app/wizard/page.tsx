@@ -6,7 +6,7 @@ import { SECTORS, SECTOR_QUESTIONS, type SectorKey } from "@/lib/sector-config";
 
 type QA = { id: string; label: string; help?: string };
 
-// Helper: robustly resolve a sector label from whatever shape SECTORS uses.
+// ---------- helpers ----------
 function resolveSectorLabel(sector: string | null | undefined): string {
   if (!sector) return "";
   const list = SECTORS as unknown as Array<Record<string, unknown>>;
@@ -23,6 +23,68 @@ function resolveSectorLabel(sector: string | null | undefined): string {
   return label ?? sector;
 }
 
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+/**
+ * Safely pull and normalize sector questions into {id,label,help}[]
+ * Accepts items shaped like:
+ *  - { id, label, help? }
+ *  - { key, label, help? }
+ *  - { id, name, help? }
+ *  - { key, name, help? }
+ *  - { label } (we'll derive an id)
+ *  - { name } (we'll derive an id)
+ */
+function getSectorQuestions(sector: string | ""): QA[] {
+  if (!sector) return [];
+  // We aren't assuming the exact TS type exported by sector-config.
+  const rawMap = (SECTOR_QUESTIONS ?? {}) as unknown as Record<
+    string,
+    unknown
+  >;
+
+  const bucket = rawMap[sector];
+  if (!Array.isArray(bucket)) return [];
+
+  const arr = bucket as Array<Record<string, unknown>>;
+
+  const normalized: QA[] = arr
+    .map((q, idx) => {
+      const idRaw =
+        (q.id as string | undefined) ??
+        (q.key as string | undefined) ??
+        (q["slug"] as string | undefined) ??
+        undefined;
+
+      const labelRaw =
+        (q.label as string | undefined) ??
+        (q.name as string | undefined) ??
+        (q["question"] as string | undefined) ??
+        "";
+
+      const helpRaw =
+        (q.help as string | undefined) ??
+        (q["hint"] as string | undefined) ??
+        (q["placeholder"] as string | undefined);
+
+      const label = (labelRaw ?? "").toString().trim();
+      if (!label) return null;
+
+      const id = (idRaw ?? slugify(label) ?? `q_${idx}`).toString();
+
+      return { id, label, help: helpRaw };
+    })
+    .filter(Boolean) as QA[];
+
+  return normalized;
+}
+// ---------- end helpers ----------
+
 export default function WizardPage() {
   const [roleTitle, setRoleTitle] = useState("");
   const [location, setLocation] = useState("");
@@ -31,17 +93,15 @@ export default function WizardPage() {
 
   const sectorLabel = useMemo(() => resolveSectorLabel(sector), [sector]);
 
-  // Pull sector-specific questions safely (fallback to empty array)
-  const sectorQuestions: QA[] = useMemo(() => {
-    const map = (SECTOR_QUESTIONS || {}) as Record<string, QA[] | undefined>;
-    return (sector ? map[sector] : undefined) ?? [];
-  }, [sector]);
+  const sectorQuestions: QA[] = useMemo(
+    () => getSectorQuestions(sector),
+    [sector]
+  );
 
   const onAnswer = useCallback((id: string, val: string) => {
     setAnswers((prev) => ({ ...prev, [id]: val }));
   }, []);
 
-  // Build a single markdown-ish brief (what your generator reads)
   const brief = useMemo(() => {
     const lines: string[] = ["# Role Brief"];
     if (roleTitle) lines.push(`Role: ${roleTitle}`);
