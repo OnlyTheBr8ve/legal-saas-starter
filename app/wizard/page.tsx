@@ -1,234 +1,177 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import {
-  SECTORS,
-  SECTOR_QUESTIONS,
-  type SectorKey,
-} from "@/lib/sector-config";
+import { SECTORS, SECTOR_QUESTIONS, type SectorKey } from "@/lib/sector-config";
 
-// Ensure this is a client-only page (no revalidate / no SSR issues)
+type QA = { id: string; label: string; help?: string };
+
+// Helper: robustly resolve a sector label from whatever shape SECTORS uses.
+function resolveSectorLabel(sector: string | null | undefined): string {
+  if (!sector) return "";
+  const list = SECTORS as unknown as Array<Record<string, unknown>>;
+  const found = list.find((o) => {
+    const key =
+      (o.value as string | undefined) ??
+      (o.id as string | undefined) ??
+      (o.slug as string | undefined);
+    return key === sector;
+  });
+  const label =
+    (found?.label as string | undefined) ??
+    (found?.name as string | undefined);
+  return label ?? sector;
+}
+
 export default function WizardPage() {
-  const search = useSearchParams();
-
-  // Basic form state
-  const [sector, setSector] = useState<SectorKey | "">(
-    (search.get("sector") as SectorKey) || ""
-  );
-  const [roleTitle, setRoleTitle] = useState(search.get("role") || "");
-  const [companyName, setCompanyName] = useState(search.get("company") || "");
-  const [location, setLocation] = useState(search.get("location") || "");
-  const [extraNotes, setExtraNotes] = useState(search.get("notes") || "");
-
-  // Dynamic, sector-specific answers bucket
-  const sectorQuestions = sector ? SECTOR_QUESTIONS[sector] ?? [] : [];
+  const [roleTitle, setRoleTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [sector, setSector] = useState<SectorKey | "">("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
-  function setAnswer(key: string, value: string) {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
-  }
+  const sectorLabel = useMemo(() => resolveSectorLabel(sector), [sector]);
 
-  // Compose the final prompt the Dashboard will receive
-  const composedPrompt = useMemo(() => {
-    const lines: string[] = [];
+  // Pull sector-specific questions safely (fallback to empty array)
+  const sectorQuestions: QA[] = useMemo(() => {
+    const map = (SECTOR_QUESTIONS || {}) as Record<string, QA[] | undefined>;
+    return (sector ? map[sector] : undefined) ?? [];
+  }, [sector]);
 
-    if (companyName) lines.push(`Company: ${companyName}`);
+  const onAnswer = useCallback((id: string, val: string) => {
+    setAnswers((prev) => ({ ...prev, [id]: val }));
+  }, []);
+
+  // Build a single markdown-ish brief (what your generator reads)
+  const brief = useMemo(() => {
+    const lines: string[] = ["# Role Brief"];
     if (roleTitle) lines.push(`Role: ${roleTitle}`);
     if (location) lines.push(`Location: ${location}`);
-    if (sector) lines.push(`Sector: ${SECTORS[sector].label}`);
+    if (sector) lines.push(`Sector: ${sectorLabel}`);
 
     if (sectorQuestions.length > 0) {
       lines.push("", "## Sector-specific considerations");
       for (const q of sectorQuestions) {
-        const val = answers[q.key];
-        if (val && val.trim()) {
-          lines.push(`- ${q.label}: ${val.trim()}`);
+        const a = answers[q.id];
+        if (a && a.trim().length > 0) {
+          lines.push(`- ${q.label}: ${a.trim()}`);
         }
       }
     }
-
-    if (extraNotes && extraNotes.trim()) {
-      lines.push("", "## Extra notes", extraNotes.trim());
-    }
-
-    lines.push(
-      "",
-      "## Task",
-      "Draft a contract/letter/policy tailored to the above. Use plain English, flag any assumptions you make, and suggest any missing inputs I should confirm."
-    );
-
     return lines.join("\n");
-  }, [companyName, roleTitle, location, sector, sectorQuestions, answers, extraNotes]);
-
-  const dashHref = `/dashboard?prompt=${encodeURIComponent(composedPrompt)}`;
+  }, [roleTitle, location, sector, sectorLabel, sectorQuestions, answers]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 md:px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Contract Wizard</h1>
-          <p className="text-sm text-white/60">
-            Answer a few targeted questions and send the context straight into your Dashboard.
-          </p>
+    <main className="max-w-4xl mx-auto px-6 py-10 space-y-8">
+      <header className="space-y-1">
+        <h1 className="text-3xl font-bold">Contract Wizard</h1>
+        <p className="text-white/70">
+          Fill the details below. We’ll tailor prompts and clauses to the
+          chosen sector automatically.
+        </p>
+      </header>
+
+      <section className="rounded-md border border-white/10 bg-black/30 p-4 space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm mb-1">Role title</label>
+            <input
+              className="w-full rounded-md bg-black/40 border border-white/10 px-3 py-2"
+              placeholder="e.g., Family Solicitor"
+              value={roleTitle}
+              onChange={(e) => setRoleTitle(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Location</label>
+            <input
+              className="w-full rounded-md bg-black/40 border border-white/10 px-3 py-2"
+              placeholder="e.g., London / Remote (UK)"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm mb-1">Sector</label>
+            <select
+              className="w-full rounded-md bg-black/40 border border-white/10 px-3 py-2"
+              value={sector}
+              onChange={(e) => setSector(e.target.value as SectorKey | "")}
+            >
+              <option value="">— Choose a sector —</option>
+              {(SECTORS as unknown as Array<Record<string, unknown>>).map(
+                (s, i) => {
+                  const value =
+                    (s.value as string | undefined) ??
+                    (s.id as string | undefined) ??
+                    (s.slug as string | undefined) ??
+                    "";
+                  const label =
+                    (s.label as string | undefined) ??
+                    (s.name as string | undefined) ??
+                    value;
+                  return (
+                    <option key={`${value || i}`} value={value}>
+                      {label}
+                    </option>
+                  );
+                }
+              )}
+            </select>
+            {sectorLabel && (
+              <p className="text-sm text-white/60 mt-1">
+                Selected: {sectorLabel}
+              </p>
+            )}
+          </div>
         </div>
+      </section>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(composedPrompt);
-            }}
-            className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-          >
-            Copy prompt
-          </button>
+      {sectorQuestions.length > 0 && (
+        <section className="rounded-md border border-white/10 bg-black/30 p-4 space-y-3">
+          <h2 className="text-lg font-semibold">Sector-specific questions</h2>
+          <div className="space-y-3">
+            {sectorQuestions.map((q) => (
+              <div key={q.id}>
+                <label className="block text-sm mb-1">{q.label}</label>
+                <input
+                  className="w-full rounded-md bg-black/40 border border-white/10 px-3 py-2"
+                  placeholder={q.help || ""}
+                  value={answers[q.id] ?? ""}
+                  onChange={(e) => onAnswer(q.id, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
+      <section className="rounded-md border border-white/10 bg-black/30 p-4">
+        <h2 className="text-lg font-semibold mb-2">Generated brief</h2>
+        <pre className="whitespace-pre-wrap text-sm bg-black/40 p-3 rounded border border-white/10">
+          {brief}
+        </pre>
+        <div className="mt-3 flex gap-3">
           <Link
-            href={dashHref}
-            className="rounded-md border border-white/15 bg-white px-3 py-2 text-sm text-black hover:opacity-90"
+            href={{
+              pathname: "/dashboard",
+              query: {
+                sector,
+                role: roleTitle,
+                location,
+                brief,
+              },
+            }}
+            className="inline-flex items-center rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 border border-white/15"
           >
-            Use in Dashboard
+            Continue to Dashboard
           </Link>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* LEFT: Form */}
-        <section className="rounded-lg border border-white/10 bg-black/30">
-          <div className="border-b border-white/10 px-4 py-3">
-            <h2 className="text-sm font-semibold">Your context</h2>
-          </div>
-
-          <div className="p-4 space-y-4">
-            <div>
-              <label className="block text-sm mb-1">Sector</label>
-              <select
-                className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                value={sector}
-                onChange={(e) => {
-                  setSector(e.target.value as SectorKey | "");
-                  setAnswers({});
-                }}
-              >
-                <option value="">Select a sector…</option>
-                {Object.entries(SECTORS).map(([key, { label }]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm mb-1">Role / Title</label>
-                <input
-                  className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                  value={roleTitle}
-                  onChange={(e) => setRoleTitle(e.target.value)}
-                  placeholder="e.g. Bar Supervisor / Family Solicitor"
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Company</label>
-                <input
-                  className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Your company or trading name"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm mb-1">Location</label>
-              <input
-                className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Jurisdiction or work location"
-              />
-            </div>
-
-            {sector && sectorQuestions.length > 0 && (
-              <div className="pt-2">
-                <h3 className="font-semibold mb-2 text-sm">
-                  Sector-specific questions
-                </h3>
-                <div className="space-y-3">
-                  {sectorQuestions.map((q) => (
-                    <div key={q.key}>
-                      <label className="block text-sm mb-1">{q.label}</label>
-                      {q.type === "select" ? (
-                        <select
-                          className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                          value={answers[q.key] ?? ""}
-                          onChange={(e) => setAnswer(q.key, e.target.value)}
-                        >
-                          <option value="">Select…</option>
-                          {(q.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          className="w-full rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                          value={answers[q.key] ?? ""}
-                          onChange={(e) => setAnswer(q.key, e.target.value)}
-                          placeholder={q.placeholder ?? ""}
-                        />
-                      )}
-                      {q.hint && (
-                        <p className="text-xs text-white/50 mt-1">{q.hint}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm mb-1">Extra notes (optional)</label>
-              <textarea
-                className="w-full min-h-[120px] rounded-md bg-black/20 border border-white/15 px-3 py-2"
-                value={extraNotes}
-                onChange={(e) => setExtraNotes(e.target.value)}
-                placeholder="Anything unusual? Add specific instructions here."
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* RIGHT: Composed prompt preview */}
-        <section className="rounded-lg border border-white/10 bg-black/30">
-          <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Composed prompt</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigator.clipboard.writeText(composedPrompt)}
-                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-              >
-                Copy
-              </button>
-              <Link
-                href={dashHref}
-                className="rounded-md border border-white/15 bg-white px-3 py-2 text-sm text-black hover:opacity-90"
-              >
-                Use in Dashboard
-              </Link>
-            </div>
-          </div>
-          <div className="p-4">
-            <pre className="whitespace-pre-wrap text-sm leading-6">
-              {composedPrompt}
-            </pre>
-          </div>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
 
+// Keep this page fully dynamic to avoid static export issues with client hooks
+export const dynamic = "force-dynamic";
