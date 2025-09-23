@@ -87,3 +87,12 @@ export async function saveDraft(draft: DraftItem): Promise<{ ok: true }> {
   // In the future, persist to DB/KV here.
   return { ok: true };
 }
+// ---- Client helper to POST to our API route ----
+export async function postDraftToApi(draft: DraftItem): Promise<void> {
+  // Safe on the client; on the server you’d call saveDraft directly.
+  await fetch("/api/save-draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(draft),
+  });
+}
