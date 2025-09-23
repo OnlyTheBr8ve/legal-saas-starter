@@ -1,10 +1,9 @@
-// app/wizard/page.tsx (SERVER COMPONENT)
+// app/wizard/page.tsx (SERVER component)
 import { Suspense } from "react";
 import WizardClient from "./wizard-client";
 
-// Force no caching for this segment (valid values: 0 or false)
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 0;            // no ISR for the wizard
+export const dynamic = "force-dynamic"; // keep this CSR-only
 
 export default function WizardPage() {
   return (
