@@ -1,86 +1,67 @@
 // templates/[slug]/page.tsx
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { TEMPLATES, TEMPLATES_BY_SLUG, type TemplateDef } from "@/lib/templates";
+import { TEMPLATES } from "@/lib/templates";
+
+export const revalidate = 0;
 
 type Params = { slug: string };
 
-// <head> metadata for each template page
-export async function generateMetadata(
-  { params }: { params: Params }
-): Promise<Metadata> {
-  const t = TEMPLATES_BY_SLUG[params.slug];
-  if (!t) return {};
+function getTemplateBySlug(slug: string) {
+  const list = (TEMPLATES as any[]) || [];
+  return list.find((t) => t?.slug === slug) as any | undefined;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Params;
+}): Promise<Metadata> {
+  const tpl = getTemplateBySlug(params.slug);
+  if (!tpl) return {};
   return {
-    title: `${t.title} — Free Template`,
-    description: t.summary, // <- use summary, not excerpt
+    title: `${tpl.title} — Template`,
+    description: `Generate a ${tpl.title} using the template.`,
   };
 }
 
-export default function TemplateDetailPage({ params }: { params: Params }) {
-  const tpl: TemplateDef | undefined = TEMPLATES_BY_SLUG[params.slug];
+export default function TemplatePage({ params }: { params: Params }) {
+  const tpl = getTemplateBySlug(params.slug);
+  if (!tpl) notFound();
 
-  if (!tpl) {
-    return (
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold">Template not found</h1>
-        <p className="text-white/70 mt-2">
-          We couldn’t find that template.{" "}
-          <Link href="/templates" className="underline">Back to Templates</Link>
-        </p>
-      </main>
-    );
-  }
+  // ✅ Always coerce to string before encodeURIComponent
+  const promptStr = String(tpl?.examplePrompt ?? "");
+  const slugStr = String(tpl?.slug ?? "");
 
-  const dashboardUrl = `/dashboard?prompt=${encodeURIComponent(tpl.examplePrompt)}`;
-  const wizardUrl = `/wizard?type=${encodeURIComponent(tpl.slug)}`;
+  const dashboardUrl = `/dashboard?prompt=${encodeURIComponent(promptStr)}`;
+  const wizardUrl = `/wizard?type=${encodeURIComponent(slugStr)}`;
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
-      <Link href="/templates" className="text-white/70 hover:underline text-sm">
-        ← Back to Templates
-      </Link>
-
       <h1 className="text-3xl font-bold">{tpl.title}</h1>
-      <p className="text-white/70">{tpl.summary}</p>
 
-      <div className="flex flex-wrap gap-2">
-        {tpl.sectors.map((s) => (
-          <span
-            key={s}
-            className="text-xs rounded bg-white/10 px-2 py-0.5 border border-white/10"
-          >
-            {s}
-          </span>
-        ))}
-      </div>
-
-      <div className="rounded-md bg-black/20 border border-white/10 p-4">
-        <h3 className="font-semibold mb-2">Example prompt</h3>
-        <pre className="whitespace-pre-wrap text-sm text-white/80">
-          {tpl.examplePrompt}
-        </pre>
-      </div>
+      {promptStr && (
+        <section className="rounded-md bg-black/20 border border-white/10 p-4 whitespace-pre-wrap">
+          <h3 className="font-semibold mb-2">Example prompt</h3>
+          <p className="text-white/80">{promptStr}</p>
+        </section>
+      )}
 
       <div className="flex gap-3">
         <Link
           href={dashboardUrl}
-          className="rounded-md px-4 py-2 bg-white text-black font-medium hover:opacity-90"
+          className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 border border-white/15"
         >
-          Use in Dashboard
+          Open in Dashboard
         </Link>
         <Link
           href={wizardUrl}
-          className="rounded-md px-4 py-2 border border-white/20 hover:border-white/40"
+          className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 border border-white/15"
         >
-          Try the Wizard
+          Start with Wizard
         </Link>
       </div>
     </main>
   );
-}
-
-// Prebuild dynamic routes
-export function generateStaticParams() {
-  return TEMPLATES.map((t) => ({ slug: t.slug }));
 }
