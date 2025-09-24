@@ -10,8 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerSupabase();
+
   const { data, error } = await supabase
-    .from<DraftRow>("drafts")
+    .from("drafts")
     .select("*")
     .eq("id", params.id)
     .single();
@@ -19,10 +20,10 @@ export async function GET(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
-  return NextResponse.json({ draft: data });
+  return NextResponse.json({ draft: data as DraftRow });
 }
 
-// PATCH /api/drafts/:id  (title/content/sector)
+// PATCH /api/drafts/:id
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
@@ -42,16 +43,16 @@ export async function PATCH(
 
   const supabase = createServerSupabase();
   const { data, error } = await supabase
-    .from<DraftRow>("drafts")
+    .from("drafts")
     .update(update as Partial<DraftRow>)
     .eq("id", params.id)
-    .select()
+    .select("*")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ draft: data });
+  return NextResponse.json({ draft: data as DraftRow });
 }
 
 // DELETE /api/drafts/:id
@@ -60,10 +61,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerSupabase();
-  const { error } = await supabase
-    .from<DraftRow>("drafts")
-    .delete()
-    .eq("id", params.id);
+  const { error } = await supabase.from("drafts").delete().eq("id", params.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
