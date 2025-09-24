@@ -4,14 +4,14 @@ import { createServerSupabase, type DraftRow } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-// GET /api/drafts/:id -> fetch one
+// GET /api/drafts/:id
 export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerSupabase();
   const { data, error } = await supabase
-    .from("drafts")
+    .from<DraftRow>("drafts")
     .select("*")
     .eq("id", params.id)
     .single();
@@ -19,10 +19,10 @@ export async function GET(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
-  return NextResponse.json({ draft: data as DraftRow });
+  return NextResponse.json({ draft: data });
 }
 
-// PATCH /api/drafts/:id -> update title/content/sector
+// PATCH /api/drafts/:id  (title/content/sector)
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
@@ -33,7 +33,7 @@ export async function PATCH(
     sector: string | null;
   }>;
 
-  const update: Record<string, unknown> = {};
+  const update: Partial<DraftRow> = {};
   if (typeof body.title === "string") update.title = body.title.slice(0, 200);
   if (typeof body.content === "string") update.content = body.content;
   if (body.sector === null) update.sector = null;
@@ -42,8 +42,8 @@ export async function PATCH(
 
   const supabase = createServerSupabase();
   const { data, error } = await supabase
-    .from("drafts")
-    .update(update)
+    .from<DraftRow>("drafts")
+    .update(update as Partial<DraftRow>)
     .eq("id", params.id)
     .select()
     .single();
@@ -51,16 +51,20 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ draft: data as DraftRow });
+  return NextResponse.json({ draft: data });
 }
 
-// DELETE /api/drafts/:id -> delete
+// DELETE /api/drafts/:id
 export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerSupabase();
-  const { error } = await supabase.from("drafts").delete().eq("id", params.id);
+  const { error } = await supabase
+    .from<DraftRow>("drafts")
+    .delete()
+    .eq("id", params.id);
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
