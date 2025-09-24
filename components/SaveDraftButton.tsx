@@ -8,42 +8,28 @@ import {
 } from "@/lib/save-draft";
 
 type Props = {
-  /** The markdown/text to save */
   content: string;
-  /** Optional display title; if omitted, we derive one */
   title?: string;
-  /** Optional sector key (used for grouping/filtering) */
   sector?: string;
-  /** Optional className for the button */
   className?: string;
-  /** Optional children; defaults to “Save to Drafts” */
   children?: React.ReactNode;
 };
 
 function deriveSafeTitle(rawTitle: string | undefined, body: string): string {
-  // Prefer explicit title
   if (rawTitle && rawTitle.trim().length > 0) return rawTitle.trim();
-
-  // Otherwise, try the first non-empty line of the content (up to 80 chars)
   const firstLine =
     body
       ?.split(/\r?\n/)
       .map((l) => l.trim())
       .find((l) => l.length > 0) ?? "";
-
   if (firstLine.length > 0) return firstLine.slice(0, 80);
-
-  // Final fallback
   return "Untitled";
 }
 
-// Small helper to generate a UUID across browsers/environments
 function makeId() {
   try {
-    // modern browsers / Node 19+
     return crypto.randomUUID();
   } catch {
-    // fallback
     return `draft_${Math.random().toString(36).slice(2)}_${Date.now()}`;
   }
 }
@@ -64,25 +50,22 @@ export default function SaveDraftButton({
     }
 
     const safeTitle = deriveSafeTitle(title, content);
-    const nowIso = new Date().toISOString();
+    const now = Date.now(); // <-- numeric timestamps
 
-    // Build a full DraftItem to satisfy writeLocalDraft’s signature
     const draft: DraftItem = {
       id: makeId(),
       title: safeTitle,
       content,
-      sector, // can be undefined
-      createdAt: nowIso,
-      updatedAt: nowIso,
+      sector, // optional
+      createdAt: now,   // <-- numbers, not ISO strings
+      updatedAt: now,   // <-- numbers, not ISO strings
     };
 
     setSaving(true);
     try {
       const saved = writeLocalDraft(draft);
-
-      // Fire-and-forget (ok if your API is a no-op for now)
+      // fire-and-forget; ok if your API is a no-op for now
       postDraftToApi(saved).catch(() => {});
-
       alert(`Saved “${saved.title || "Untitled"}” to Drafts.`);
     } catch (err) {
       console.error(err);
