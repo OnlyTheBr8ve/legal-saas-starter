@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { writeLocalDraft, postDraftToApi } from "@/lib/save-draft";
+import {
+  writeLocalDraft,
+  postDraftToApi,
+  type DraftItem,
+} from "@/lib/save-draft";
 
 type Props = {
   /** The markdown/text to save */
@@ -16,6 +20,34 @@ type Props = {
   children?: React.ReactNode;
 };
 
+function deriveSafeTitle(rawTitle: string | undefined, body: string): string {
+  // Prefer explicit title
+  if (rawTitle && rawTitle.trim().length > 0) return rawTitle.trim();
+
+  // Otherwise, try the first non-empty line of the content (up to 80 chars)
+  const firstLine =
+    body
+      ?.split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+
+  if (firstLine.length > 0) return firstLine.slice(0, 80);
+
+  // Final fallback
+  return "Untitled";
+}
+
+// Small helper to generate a UUID across browsers/environments
+function makeId() {
+  try {
+    // modern browsers / Node 19+
+    return crypto.randomUUID();
+  } catch {
+    // fallback
+    return `draft_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+  }
+}
+
 export default function SaveDraftButton({
   content,
   title,
@@ -25,23 +57,6 @@ export default function SaveDraftButton({
 }: Props) {
   const [saving, setSaving] = useState(false);
 
-  function deriveSafeTitle(rawTitle: string | undefined, body: string): string {
-    // Prefer explicit title
-    if (rawTitle && rawTitle.trim().length > 0) return rawTitle.trim();
-
-    // Otherwise, try the first non-empty line of the content (up to 80 chars)
-    const firstLine =
-      body
-        ?.split(/\r?\n/)
-        .map((l) => l.trim())
-        .find((l) => l.length > 0) ?? "";
-
-    if (firstLine.length > 0) return firstLine.slice(0, 80);
-
-    // Final fallback
-    return "Untitled";
-  }
-
   async function handleSave() {
     if (!content || content.trim().length === 0) {
       alert("Nothing to save — the content is empty.");
@@ -49,17 +64,23 @@ export default function SaveDraftButton({
     }
 
     const safeTitle = deriveSafeTitle(title, content);
+    const nowIso = new Date().toISOString();
+
+    // Build a full DraftItem to satisfy writeLocalDraft’s signature
+    const draft: DraftItem = {
+      id: makeId(),
+      title: safeTitle,
+      content,
+      sector, // can be undefined
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
 
     setSaving(true);
     try {
-      // Persist locally (authoritative source for the Drafts panel)
-      const saved = writeLocalDraft({
-        content,
-        title: safeTitle, // now guaranteed string
-        sector, // optional; your lib layer supports this
-      });
+      const saved = writeLocalDraft(draft);
 
-      // Fire-and-forget network call (e.g., to echo or real persistence later)
+      // Fire-and-forget (ok if your API is a no-op for now)
       postDraftToApi(saved).catch(() => {});
 
       alert(`Saved “${saved.title || "Untitled"}” to Drafts.`);
