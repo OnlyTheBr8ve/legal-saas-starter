@@ -1,16 +1,15 @@
-// app/templates/[slug]/page.tsx
+// templates/[slug]/page.tsx
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { TEMPLATES } from "@/lib/templates";
 
-// Keep ISR simple & valid (must be number or false)
+// Valid ISR value
 export const revalidate = 0;
 
 type Params = { slug: string };
 
 function getTemplateBySlug(slug: string) {
-  // Avoid type issues by treating the data as generic objects
   const list = (TEMPLATES as any[]) || [];
   return list.find((t) => t?.slug === slug) as any | undefined;
 }
@@ -32,9 +31,12 @@ export default function TemplatePage({ params }: { params: Params }) {
   const tpl = getTemplateBySlug(params.slug);
   if (!tpl) notFound();
 
-  const prompt: string = tpl?.examplePrompt ?? "";
+  // Always coerce to string before encodeURIComponent
+  const prompt: string = String(tpl?.examplePrompt ?? "");
+  const slugStr: string = String(tpl?.slug ?? "");
+
   const dashboardUrl = `/dashboard?prompt=${encodeURIComponent(prompt)}`;
-  const wizardUrl = `/wizard?type=${encodeURIComponent(String(tpl?.slug ?? ""))}`;
+  const wizardUrl = `/wizard?type=${encodeURIComponent(slugStr)}`;
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
