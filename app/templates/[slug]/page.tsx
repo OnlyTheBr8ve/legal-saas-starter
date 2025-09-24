@@ -8,7 +8,7 @@ export const revalidate = 0;
 
 type Params = { slug: string };
 
-// Tiny helper so we don't fight types from whatever TEMPLATES shape is.
+// Helper to find a template safely
 function getTemplateBySlug(slug: string) {
   const list = (TEMPLATES as any[]) || [];
   return list.find((t) => t?.slug === slug) as any | undefined;
@@ -31,7 +31,7 @@ export default function TemplatePage({ params }: { params: Params }) {
   const tpl = getTemplateBySlug(params.slug);
   if (!tpl) notFound();
 
-  // ✅ Always coerce possibly-undefined values to strings BEFORE encoding
+  // ✅ Coerce to string first to satisfy TS and runtime
   const promptStr = String(tpl?.examplePrompt ?? "");
   const slugStr = String(tpl?.slug ?? "");
 
