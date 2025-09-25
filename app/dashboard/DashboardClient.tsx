@@ -5,14 +5,6 @@ import { useMemo, useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SECTORS } from "@/lib/sector-config";
 import SaveDraftButton from "@/components/SaveDraftButton";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea"; // if you don't have this, swap for a <textarea>
 
 type SectorOption = { value: string; label: string };
 
@@ -23,7 +15,7 @@ function toTitleCase(s: string) {
 }
 
 function normalizeSectors(input: unknown): SectorOption[] {
-  // Shape 1: Array of { value, label }
+  // 1) Already [{ value, label }]
   if (Array.isArray(input)) {
     const arr = input as any[];
     if (arr.length === 0) return [];
@@ -31,13 +23,12 @@ function normalizeSectors(input: unknown): SectorOption[] {
     if (first && typeof first === "object" && "value" in first && "label" in first) {
       return arr as SectorOption[];
     }
-    // Shape 2: Array of strings
+    // 2) Array of strings
     if (typeof first === "string") {
       return (arr as string[]).map((v) => ({ value: v, label: toTitleCase(v) }));
     }
   }
-
-  // Shape 3: Record<string, string>
+  // 3) Record<string, string>
   if (input && typeof input === "object") {
     const entries = Object.entries(input as Record<string, string>);
     return entries.map(([value, label]) => ({
@@ -45,8 +36,6 @@ function normalizeSectors(input: unknown): SectorOption[] {
       label: label ?? toTitleCase(value),
     }));
   }
-
-  // Fallback: no sectors
   return [];
 }
 
@@ -55,19 +44,15 @@ export default function DashboardClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Normalize sector options from whatever SECTORS shape you have
   const sectorOptions = useMemo(() => normalizeSectors(SECTORS), []);
   const firstOption = sectorOptions[0]?.value ?? "";
 
-  // Read initial sector from the URL
   const initialSector = searchParams.get("sector") ?? "";
-
   const [sector, setSector] = useState<string>(initialSector || firstOption);
-  const [content, setContent] = useState<string>(""); // your editor’s content can populate this
+  const [content, setContent] = useState<string>("");
 
-  // Ensure URL always mirrors local state (and vice versa)
+  // seed URL if empty
   useEffect(() => {
-    // If URL had nothing and we have options, seed it
     if (!initialSector && firstOption) {
       const params = new URLSearchParams(searchParams.toString());
       params.set("sector", firstOption);
@@ -75,7 +60,7 @@ export default function DashboardClient() {
       setSector(firstOption);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstOption]); // run once when options resolve
+  }, [firstOption]);
 
   const updateUrl = useCallback(
     (next: string) => {
@@ -87,7 +72,8 @@ export default function DashboardClient() {
     [pathname, router, searchParams]
   );
 
-  const onSectorChange = (val: string) => {
+  const onSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
     setSector(val);
     updateUrl(val);
   };
@@ -101,35 +87,34 @@ export default function DashboardClient() {
         </p>
       </header>
 
-      {/* Sector selector */}
+      {/* Sector selector (native) */}
       <section className="space-y-2">
         <label className="block text-sm font-medium">Sector</label>
-        <Select value={sector} onValueChange={onSectorChange}>
-          <SelectTrigger className="w-full sm:w-80">
-            <SelectValue placeholder="Select a sector" />
-          </SelectTrigger>
-          <SelectContent>
-            {sectorOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <select
+          value={sector}
+          onChange={onSectorChange}
+          className="w-full sm:w-80 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+        >
+          {sectorOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </section>
 
-      {/* Simple content editor area (replace with your rich editor if you have one) */}
+      {/* Simple content area */}
       <section className="space-y-2">
         <label className="block text-sm font-medium">Draft content</label>
-        <Textarea
+        <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Type or paste your draft here…"
-          className="min-h-[200px]"
+          className="min-h-[200px] w-full rounded-md border border-zinc-300 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
         />
       </section>
 
-      {/* Save button — passes sector through to the API */}
+      {/* Save with sector */}
       <div>
         <SaveDraftButton content={content} sector={sector} />
       </div>
