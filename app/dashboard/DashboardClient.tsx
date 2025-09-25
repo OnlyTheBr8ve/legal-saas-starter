@@ -1,119 +1,85 @@
-// app/dashboard/DashboardClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import DraftLibraryPanel from "@/components/DraftLibraryPanel";
+import SaveDraftButton from "@/components/SaveDraftButton";
+import { SECTORS } from "@/lib/sector-config";
 
-// We normalize whatever you exported from lib/sector-config
-// Works if SECTORS is an array of { value, label } OR an object map {slug: "Label"}
-import { SECTORS as RAW_SECTORS } from "@/lib/sector-config";
+// ---- Helper: make options regardless of SECTORS shape (array vs map) ----
+type Option = { value: string; label: string };
 
-// ---- Helpers to normalize sectors to array ----
-type SectorOption = { value: string; label: string };
-
-function toOptions(input: unknown): SectorOption[] {
-  // Array format
+function toOptions(input: unknown): Option[] {
+  if (!input) return [];
+  // Array form: [{ value, label }]
   if (Array.isArray(input)) {
-    // trust shape: { value, label }
-    // filter out bad records defensively
-    return input
-      .map((it: any) =>
-        it && typeof it.value === "string" && typeof it.label === "string"
-          ? ({ value: it.value, label: it.label } as SectorOption)
-          : null
-      )
-      .filter(Boolean) as SectorOption[];
+    return (input as any[])
+      .filter((o) => o && typeof o.value === "string")
+      .map((o) => ({ value: o.value as string, label: String(o.label ?? o.value) }));
   }
-
-  // Record format
-  if (input && typeof input === "object") {
-    return Object.entries(input as Record<string, string>).map(
-      ([value, label]) => ({ value, label })
-    );
+  // Map form: { key: "Label" } or { key: { label } }
+  if (typeof input === "object") {
+    return Object.entries(input as Record<string, any>).map(([k, v]) => {
+      const label = typeof v === "string" ? v : v?.label ?? k;
+      return { value: k, label: String(label) };
+    });
   }
-
   return [];
 }
 
+const sectorOptions = toOptions(SECTORS);
+
 export default function DashboardClient() {
-  const sectors = useMemo(() => toOptions(RAW_SECTORS), []);
-  const [sector, setSector] = useState<string>(""); // <— this makes the select actually selectable
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const params = useSearchParams();
+  const initialSector = params?.get("sector") ?? "";
+  const [sector, setSector] = useState<string>(initialSector);
+
+  // If URL changes (rare), update once
+  useEffect(() => {
+    const urlSector = params?.get("sector") ?? "";
+    setSector((prev) => (prev || urlSector ? (prev || urlSector) : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  const sectorLabel = useMemo(() => {
+    const found = sectorOptions.find((o) => o.value === sector);
+    return found?.label ?? sector ?? "";
+  }, [sector]);
 
   return (
-    <main className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-
-      {/* Sector selector */}
-      <section className="mt-6">
-        <label className="block text-sm mb-2">Sector</label>
+    <main className="mx-auto max-w-6xl px-4 py-6">
+      {/* Sector picker (native select = always works) */}
+      <section>
+        <label className="block text-sm text-zinc-400 mb-1">Sector</label>
         <select
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 p-2"
           value={sector}
-          onChange={(e) => setSector(e.target.value)} // <— important!
+          onChange={(e) => setSector(e.target.value)}
+          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none"
         >
           <option value="">— Choose a sector —</option>
-          {sectors.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          {sectorOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
         {sector && (
           <p className="mt-2 text-xs text-zinc-400">
-            Selected: <span className="font-medium">{sector}</span>
+            Selected: <span className="text-zinc-200">{sectorLabel}</span>
           </p>
         )}
       </section>
 
-      {/* Simple draft area (local-only for now) */}
-      <section className="mt-8 grid gap-4">
-        <input
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 p-2"
-          placeholder="Draft title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          className="min-h-[220px] w-full rounded-md border border-zinc-700 bg-zinc-900 p-3"
-          placeholder="Write or paste your content…"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              const id = crypto.randomUUID();
-              const now = new Date().toISOString();
-              const item = {
-                id,
-                title: title || "Untitled",
-                content,
-                sector: sector || null,
-                createdAt: now,
-                updatedAt: now,
-              };
-              const key = "drafts";
-              const all: typeof item[] = JSON.parse(
-                localStorage.getItem(key) || "[]"
-              );
-              all.unshift(item);
-              localStorage.setItem(key, JSON.stringify(all));
-              alert(`Saved “${item.title}”.`);
-            }}
-            className="rounded bg-white/10 px-4 py-2 hover:bg-white/20"
-          >
-            Save draft (local)
-          </button>
+      {/* Your editor / actions */}
+      <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-3">
+          {/* Put your text editor / prompt UI here. If you already have it, keep it. */}
+          {/* Example action button keeps sector flowing through to save */}
+          <SaveDraftButton sector={sector} />
+        </div>
 
-          <Link
-            className="rounded bg-white/10 px-4 py-2 hover:bg-white/20"
-            href={`/wizard${sector ? `?sector=${encodeURIComponent(sector)}` : ""}`}
-          >
-            Open Wizard
-          </Link>
+        <div>
+          <DraftLibraryPanel sector={sector} />
         </div>
       </section>
     </main>
