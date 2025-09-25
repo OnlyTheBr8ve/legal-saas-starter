@@ -42,10 +42,11 @@ export async function PATCH(
   update.updated_at = new Date().toISOString();
 
   const supabase = createServerSupabase();
-  const { data, error } = await supabase
+
+  // IMPORTANT: cast client to any here to avoid TS inferring `never` without generated types
+  const { data, error } = await (supabase as any)
     .from("drafts")
-    // IMPORTANT: avoid strict generic typing here until we add generated types
-    .update(update as any)
+    .update(update)
     .eq("id", params.id)
     .select("*")
     .single();
