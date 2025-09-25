@@ -1,87 +1,110 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import DraftLibraryPanel from "@/components/DraftLibraryPanel";
-import SaveDraftButton from "@/components/SaveDraftButton";
+import { useMemo, useState } from "react";
 import { SECTORS } from "@/lib/sector-config";
+import SaveDraftButton from "@/components/SaveDraftButton";
 
-// ---- Helper: make options regardless of SECTORS shape (array vs map) ----
-type Option = { value: string; label: string };
-
-function toOptions(input: unknown): Option[] {
-  if (!input) return [];
-  // Array form: [{ value, label }]
-  if (Array.isArray(input)) {
-    return (input as any[])
-      .filter((o) => o && typeof o.value === "string")
-      .map((o) => ({ value: o.value as string, label: String(o.label ?? o.value) }));
-  }
-  // Map form: { key: "Label" } or { key: { label } }
-  if (typeof input === "object") {
-    return Object.entries(input as Record<string, any>).map(([k, v]) => {
-      const label = typeof v === "string" ? v : v?.label ?? k;
-      return { value: k, label: String(label) };
-    });
-  }
-  return [];
+/**
+ * Normalizes SECTORS to an array of { value, label } options
+ * whether your config is:
+ *   - Record<string, string>  OR
+ *   - Array<{ value: string; label: string }>
+ */
+function useSectorOptions() {
+  return useMemo(() => {
+    if (Array.isArray(SECTORS)) {
+      // Already [{ value, label }, ...]
+      return SECTORS as Array<{ value: string; label: string }>;
+    }
+    // Assume Record<string, string>
+    return Object.entries(SECTORS as Record<string, string>).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, []);
 }
 
-const sectorOptions = toOptions(SECTORS);
-
 export default function DashboardClient() {
-  const params = useSearchParams();
-  const initialSector = params?.get("sector") ?? "";
-  const [sector, setSector] = useState<string>(initialSector);
+  const options = useSectorOptions();
 
-  // If URL changes (rare), update once
-  useEffect(() => {
-    const urlSector = params?.get("sector") ?? "";
-    setSector((prev) => (prev || urlSector ? (prev || urlSector) : ""));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  // Editor state (replace with your own editor if you have one)
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [sector, setSector] = useState<string>("");
 
   const sectorLabel = useMemo(() => {
-    const found = sectorOptions.find((o) => o.value === sector);
-    return found?.label ?? sector ?? "";
-  }, [sector]);
+    const found = options.find((o) => o.value === sector);
+    return found?.label ?? "";
+  }, [sector, options]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
-      {/* Sector picker (native select = always works) */}
-      <section>
-        <label className="block text-sm text-zinc-400 mb-1">Sector</label>
+    <main className="max-w-4xl mx-auto p-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">Draft workspace</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Choose a sector, add a title and draft your content. Click “Save Draft” to store it.
+        </p>
+      </header>
+
+      {/* Sector picker */}
+      <section className="mb-6">
+        <label htmlFor="sector" className="block text-sm font-medium mb-2">
+          Sector
+        </label>
         <select
+          id="sector"
+          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
           value={sector}
           onChange={(e) => setSector(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none"
         >
           <option value="">— Choose a sector —</option>
-          {sectorOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
-        {sector && (
-          <p className="mt-2 text-xs text-zinc-400">
-            Selected: <span className="text-zinc-200">{sectorLabel}</span>
-          </p>
+        {sectorLabel && (
+          <p className="mt-2 text-xs text-zinc-500">Selected: {sectorLabel}</p>
         )}
       </section>
 
-      {/* Your editor / actions */}
-      <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          {/* Put your text editor / prompt UI here. If you already have it, keep it. */}
-          {/* Example action button keeps sector flowing through to save */}
-          <SaveDraftButton sector={sector} />
-        </div>
+      {/* Title input */}
+      <section className="mb-4">
+        <label htmlFor="title" className="block text-sm font-medium mb-2">
+          Title
+        </label>
+        <input
+          id="title"
+          type="text"
+          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          placeholder="e.g., Website Cookies Policy"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </section>
 
-        <div>
-          <DraftLibraryPanel sector={sector} />
+      {/* Content editor (simple textarea placeholder) */}
+      <section className="mb-6">
+        <label htmlFor="content" className="block text-sm font-medium mb-2">
+          Content
+        </label>
+        <textarea
+          id="content"
+          className="w-full min-h-[280px] rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          placeholder="Start drafting here…"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
+        <div className="mt-2 text-xs text-zinc-500">
+          {content.length.toLocaleString()} characters
         </div>
       </section>
+
+      <div className="flex items-center gap-3">
+        {/* IMPORTANT: Pass content + optional title + optional sector */}
+        <SaveDraftButton content={content} title={title} sector={sector || undefined} />
+      </div>
     </main>
   );
 }
