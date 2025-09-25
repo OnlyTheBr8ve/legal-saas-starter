@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SECTORS } from "@/lib/sector-config";
+import { TEMPLATE_QUESTIONS, type WizardField } from "@/lib/wizard-questions";
 
 type SectorOption = { value: string; label: string };
 
@@ -35,14 +36,41 @@ function normalizeSectors(input: unknown): SectorOption[] {
   return [];
 }
 
+function buildPrompt(
+  templateSlug: string,
+  sector: string,
+  answers: Record<string, string>
+) {
+  const heading = `Draft: ${toTitleCase(templateSlug.replace(/-/g, " "))}`;
+  const lines: string[] = [];
+  lines.push(`# ${heading}`);
+  lines.push(`Sector: ${sector}`);
+  lines.push("");
+  lines.push("## Context / Inputs");
+  for (const [k, v] of Object.entries(answers)) {
+    if (v?.trim()) {
+      lines.push(`- **${toTitleCase(k)}:** ${v.trim()}`);
+    }
+  }
+  lines.push("");
+  lines.push("## Instructions");
+  lines.push(
+    "Use the above to produce a compliant, plain-English first draft. Where the information is missing, add TODO placeholders the user can fill later. Keep formatting clean, with headings and bullet lists where helpful."
+  );
+  return lines.join("\n");
+}
+
 export default function WizardClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Read the template slug from `?type=` (this is how your template pages link to /wizard)
+  const templateSlug = searchParams.get("type") ?? "cookies-policy";
+
+  // Sector options and URL sync
   const sectorOptions = useMemo(() => normalizeSectors(SECTORS), []);
   const firstOption = sectorOptions[0]?.value ?? "";
-
   const initialSector = searchParams.get("sector") ?? "";
   const [sector, setSector] = useState<string>(initialSector || firstOption);
 
@@ -57,10 +85,10 @@ export default function WizardClient() {
   }, [firstOption]);
 
   const updateUrl = useCallback(
-    (next: string) => {
+    (key: string, value: string | null) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (next) params.set("sector", next);
-      else params.delete("sector");
+      if (value && value.length > 0) params.set(key, value);
+      else params.delete(key);
       router.replace(`${pathname}?${params.toString()}`);
     },
     [pathname, router, searchParams]
@@ -69,19 +97,38 @@ export default function WizardClient() {
   const onSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     setSector(val);
-    updateUrl(val);
+    updateUrl("sector", val);
+  };
+
+  // Build the form from our template question config
+  const fields: WizardField[] = useMemo(() => {
+    return TEMPLATE_QUESTIONS[templateSlug] ?? [];
+  }, [templateSlug]);
+
+  // Answers state
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const setAnswer = (name: string, value: string) =>
+    setAnswers((prev) => ({ ...prev, [name]: value }));
+
+  // Live preview of the composed prompt
+  const prompt = useMemo(() => buildPrompt(templateSlug, sector, answers), [templateSlug, sector, answers]);
+
+  const gotoDashboardWithPrompt = () => {
+    const url = `/dashboard?prompt=${encodeURIComponent(prompt)}&sector=${encodeURIComponent(sector)}`;
+    router.push(url);
   };
 
   return (
-    <main className="p-6 space-y-6">
-      <header className="flex flex-col gap-2">
+    <main className="p-6 space-y-8">
+      <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Document Wizard</h1>
         <p className="text-sm text-zinc-500">
-          Answer a few questions and we’ll tailor the draft for your sector.
+          You chose: <span className="font-medium">{toTitleCase(templateSlug.replace(/-/g, " "))}</span>.
+          Fill in the details below and we’ll assemble a clean drafting brief.
         </p>
       </header>
 
-      {/* Sector selector (native) */}
+      {/* Sector selector */}
       <section className="space-y-2">
         <label className="block text-sm font-medium">Sector</label>
         <select
@@ -95,13 +142,99 @@ export default function WizardClient() {
             </option>
           ))}
         </select>
+        <p className="text-xs text-zinc-500">
+          The sector stays in the URL, so it’ll be preserved when you jump to the dashboard.
+        </p>
       </section>
 
-      {/* Your existing wizard Q&A UI goes below. Use `sector` to branch prompts/questions. */}
+      {/* Dynamic form */}
       <section className="space-y-4">
-        <div className="text-sm text-zinc-500">
-          (Wizard questions render here; they can now reliably read the{" "}
-          <code>sector</code> value and stay in sync with the URL.)
+        <h2 className="text-lg font-medium">Questions</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {fields.length === 0 && (
+            <div className="sm:col-span-2 text-sm text-zinc-500">
+              No predefined questions for this template yet. You can still proceed.
+            </div>
+          )}
+          {fields.map((f) => {
+            return (
+              <div key={f.name} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+                <label className="block text-sm font-medium mb-1">{f.label}</label>
+
+                {f.type === "text" && (
+                  <input
+                    type="text"
+                    value={answers[f.name] ?? ""}
+                    onChange={(e) => setAnswer(f.name, e.target.value)}
+                    placeholder={"placeholder" in f ? f.placeholder : undefined}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+                  />
+                )}
+
+                {f.type === "number" && (
+                  <input
+                    type="number"
+                    value={answers[f.name] ?? ""}
+                    onChange={(e) => setAnswer(f.name, e.target.value)}
+                    placeholder={"placeholder" in f ? f.placeholder : undefined}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+                  />
+                )}
+
+                {f.type === "date" && (
+                  <input
+                    type="date"
+                    value={answers[f.name] ?? ""}
+                    onChange={(e) => setAnswer(f.name, e.target.value)}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+                  />
+                )}
+
+                {f.type === "textarea" && (
+                  <textarea
+                    value={answers[f.name] ?? ""}
+                    onChange={(e) => setAnswer(f.name, e.target.value)}
+                    placeholder={"placeholder" in f ? f.placeholder : undefined}
+                    className="min-h-[120px] w-full rounded-md border border-zinc-300 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+                  />
+                )}
+
+                {f.type === "select" && (
+                  <select
+                    value={answers[f.name] ?? ""}
+                    onChange={(e) => setAnswer(f.name, e.target.value)}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+                  >
+                    <option value="">Select…</option>
+                    {f.options.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Preview + action */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Preview of drafting brief</h2>
+        <textarea
+          readOnly
+          value={prompt}
+          className="min-h-[240px] w-full rounded-md border border-zinc-300 bg-zinc-50 p-3 text-sm font-mono outline-none"
+        />
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={gotoDashboardWithPrompt}
+            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Use this in Dashboard
+          </button>
         </div>
       </section>
     </main>
