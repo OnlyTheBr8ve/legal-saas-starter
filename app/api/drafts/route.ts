@@ -1,60 +1,61 @@
 // app/api/drafts/route.ts
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import type { DraftRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-// GET /api/drafts  — list (you can trim/expand as you like)
+// GET /api/drafts -> list drafts (simple)
 export async function GET() {
   const supabase = createServerSupabase();
 
-  const { data, error } = await (supabase as any)
-    .from("drafts")
+  const { data, error } = await supabase
+    .from("drafts" as any)
     .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(100);
+    .order("updated_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ drafts: data ?? [] });
+  return NextResponse.json((data ?? []) as DraftRow[]);
 }
 
-// POST /api/drafts  — create
+// POST /api/drafts -> create a draft
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as Partial<{
-    title: string;
-    content: string;
-    sector: string | null;
-  }>;
-
-  // basic normalization
-  const title = (body.title ?? "Untitled").slice(0, 200);
-  const content = body.content ?? "";
-  const sector = (body.sector ?? null) as string | null;
-
   const supabase = createServerSupabase();
+  const body = await req.json().catch(() => ({}));
 
-  // IMPORTANT: cast client to `any` to avoid TS inferring `never` without generated DB types
+  const title =
+    typeof body.title === "string" && body.title.trim()
+      ? (body.title as string)
+      : "Untitled";
+
+  const content =
+    typeof body.content === "string" ? (body.content as string) : "";
+
+  const sector =
+    typeof body.sector === "string" || body.sector === null
+      ? (body.sector as string | null)
+      : null;
+
+  const now = new Date().toISOString();
+
+  const insertRow = {
+    title,
+    content,
+    sector,
+    created_at: now,
+    updated_at: now,
+  };
+
   const { data, error } = await (supabase as any)
     .from("drafts")
-    .insert([{ title, content, sector }])
+    .insert([insertRow] as any)
     .select("*")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ draft: data }, { status: 201 });
-}
-
-// (Optional) preflight
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
+  return NextResponse.json(data as DraftRow, { status: 201 });
 }
