@@ -4,13 +4,6 @@ import * as React from "react";
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SECTORS } from "@/lib/sector-config";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 
 type SectorOption = { value: string; label: string };
 
@@ -53,7 +46,6 @@ export default function WizardClient() {
   const initialSector = searchParams.get("sector") ?? "";
   const [sector, setSector] = useState<string>(initialSector || firstOption);
 
-  // keep URL and state in sync
   useEffect(() => {
     if (!initialSector && firstOption) {
       const params = new URLSearchParams(searchParams.toString());
@@ -74,7 +66,8 @@ export default function WizardClient() {
     [pathname, router, searchParams]
   );
 
-  const onSectorChange = (val: string) => {
+  const onSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
     setSector(val);
     updateUrl(val);
   };
@@ -88,28 +81,27 @@ export default function WizardClient() {
         </p>
       </header>
 
-      {/* Sector selector */}
+      {/* Sector selector (native) */}
       <section className="space-y-2">
         <label className="block text-sm font-medium">Sector</label>
-        <Select value={sector} onValueChange={onSectorChange}>
-          <SelectTrigger className="w-full sm:w-80">
-            <SelectValue placeholder="Select a sector" />
-          </SelectTrigger>
-          <SelectContent>
-            {sectorOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <select
+          value={sector}
+          onChange={onSectorChange}
+          className="w-full sm:w-80 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+        >
+          {sectorOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </section>
 
-      {/* Your existing wizard Q&A goes here — keep using `sector` to drive logic */}
+      {/* Your existing wizard Q&A UI goes below. Use `sector` to branch prompts/questions. */}
       <section className="space-y-4">
         <div className="text-sm text-zinc-500">
-          (Your wizard questions/components render here; they can now reliably read the{" "}
-          <code>sector</code> state and from the URL.)
+          (Wizard questions render here; they can now reliably read the{" "}
+          <code>sector</code> value and stay in sync with the URL.)
         </div>
       </section>
     </main>
