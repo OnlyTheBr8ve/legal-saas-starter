@@ -4,30 +4,37 @@ import { useMemo, useState } from "react";
 import { SECTORS } from "@/lib/sector-config";
 import SaveDraftButton from "@/components/SaveDraftButton";
 
-/**
- * Normalizes SECTORS to an array of { value, label } options
- * whether your config is:
- *   - Record<string, string>  OR
- *   - Array<{ value: string; label: string }>
- */
-function useSectorOptions() {
-  return useMemo(() => {
-    if (Array.isArray(SECTORS)) {
-      // Already [{ value, label }, ...]
-      return SECTORS as Array<{ value: string; label: string }>;
-    }
-    // Assume Record<string, string>
-    return Object.entries(SECTORS as Record<string, string>).map(([value, label]) => ({
+// Normalize whatever SECTORS looks like into [{ value, label }]
+function normalizeSectors(raw: unknown): Array<{ value: string; label: string }> {
+  if (Array.isArray(raw)) {
+    return (raw as any[]).map((o) => {
+      if (typeof o === "string") return { value: o, label: o };
+      const value =
+        (o as any).value ??
+        (o as any).slug ??
+        (o as any).id ??
+        (o as any).key ??
+        "";
+      const label =
+        (o as any).label ??
+        (o as any).name ??
+        (o as any).title ??
+        value ??
+        "";
+      return { value: String(value ?? ""), label: String(label ?? "") };
+    });
+  }
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw as Record<string, string>).map(([value, label]) => ({
       value,
       label,
     }));
-  }, []);
+  }
+  return [];
 }
 
 export default function DashboardClient() {
-  const options = useSectorOptions();
-
-  // Editor state (replace with your own editor if you have one)
+  const options = useMemo(() => normalizeSectors(SECTORS), []);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sector, setSector] = useState<string>("");
@@ -102,7 +109,7 @@ export default function DashboardClient() {
       </section>
 
       <div className="flex items-center gap-3">
-        {/* IMPORTANT: Pass content + optional title + optional sector */}
+        {/* IMPORTANT: SaveDraftButton needs content; title/sector are optional */}
         <SaveDraftButton content={content} title={title} sector={sector || undefined} />
       </div>
     </main>
