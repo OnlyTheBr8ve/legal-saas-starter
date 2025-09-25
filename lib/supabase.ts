@@ -1,57 +1,48 @@
 // lib/supabase.ts
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// ---- ENV ----
-// Browser (public) – safe to expose, used by client if/when needed
-const PUBLIC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const PUBLIC_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Server (secret) – NEVER expose to the browser. Used in route handlers.
-const SERVICE_URL = process.env.SUPABASE_URL || PUBLIC_URL;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SERVICE_URL) {
-  throw new Error("Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL env var");
-}
-
-// Re-use a singleton between hot reloads in dev
-const globalForSupabase = global as unknown as {
-  serverClient?: ReturnType<typeof createClient>;
-  browserClient?: ReturnType<typeof createClient>;
+// Keep a single client per runtime to avoid re-creating on hot reloads
+type SupaStore = {
+  browserClient?: SupabaseClient;
+  serverClient?: SupabaseClient;
 };
+const __store = (globalThis as any).__supa ?? ((globalThis as any).__supa = {} as SupaStore);
 
-export function createServerSupabase() {
-  if (!globalForSupabase.serverClient) {
-    if (!SERVICE_ROLE) {
-      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY env var");
-    }
-    globalForSupabase.serverClient = createClient(SERVICE_URL, SERVICE_ROLE, {
-      auth: { persistSession: false },
-    });
-  }
-  return globalForSupabase.serverClient;
+// Helper to *narrow* env var types to string for TS and fail fast at runtime
+function requiredEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v; // <- now typed as string
 }
 
-export function createBrowserSupabase() {
-  if (!PUBLIC_URL || !PUBLIC_ANON) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars"
-    );
-  }
-  if (!globalForSupabase.browserClient) {
-    globalForSupabase.browserClient = createClient(PUBLIC_URL, PUBLIC_ANON, {
-      auth: { persistSession: true },
-    });
-  }
-  return globalForSupabase.browserClient;
+/**
+ * Use on the server (API routes, Route Handlers, Server Components).
+ * Uses the Service Role key. NEVER expose this in the browser.
+ */
+export function createServerSupabase(): SupabaseClient {
+  if (__store.serverClient) return __store.serverClient;
+
+  const url = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+  __store.serverClient = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false }, // no cookies/sessions on server client
+  });
+  return __store.serverClient;
 }
 
-// Minimal row type (matches the SQL we ran)
-export type DraftRow = {
-  id: string;
-  title: string;
-  content: string;
-  sector: string | null;
-  created_at: string; // ISO
-  updated_at: string; // ISO
-};
+/**
+ * Use in Client Components only if/when you need client-side Supabase.
+ * Uses the anon key which is safe for the browser.
+ */
+export function createBrowserSupabase(): SupabaseClient {
+  if (__store.browserClient) return __store.browserClient;
+
+  const url = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const anonKey = requiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+  __store.browserClient = createClient(url, anonKey);
+  return __store.browserClient;
+}
+
+export type { SupabaseClient };
