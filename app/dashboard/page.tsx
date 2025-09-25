@@ -2,14 +2,11 @@
 import { Suspense } from "react";
 import DashboardClient from "./DashboardClient";
 
-// Ensure this page isn’t pre-rendered in a way that trips CSR bailout checks
-export const dynamic = "force-dynamic";
-export const revalidate = 0; // disable ISR for this page
-export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // avoid SSG complaining around client hooks
 
-export default function DashboardPage() {
+export default function Page() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-zinc-500">Loading dashboard…</div>}>
+    <Suspense fallback={<div className="p-6 text-zinc-400">Loading…</div>}>
       <DashboardClient />
     </Suspense>
   );
