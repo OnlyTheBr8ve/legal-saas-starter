@@ -9,7 +9,7 @@ import { SECTORS } from "@/lib/sector-config";
 
 type Option = { value: string; label: string };
 
-// Try to be resilient whether SECTORS is an array of options or an object map.
+// Normalize SECTORS whether it's an array of {value,label} or a record map
 function asOptions(input: any): Option[] {
   if (Array.isArray(input)) {
     return input.map((it: any) =>
@@ -31,7 +31,6 @@ export default function DashboardClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // hydrate from URL (prompt, title, sector are optional)
   const initialSector = searchParams.get("sector") || "";
   const initialTitle = searchParams.get("title") || "";
   const initialPrompt = searchParams.get("prompt") || "";
@@ -40,7 +39,7 @@ export default function DashboardClient() {
   const [title, setTitle] = useState<string>(initialTitle);
   const [content, setContent] = useState<string>(initialPrompt);
 
-  // Keep URL in sync when sector changes (lightweight shareable links)
+  // keep URL in sync with selected sector for shareable links
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (sector) params.set("sector", sector);
@@ -63,7 +62,6 @@ export default function DashboardClient() {
         Pick a sector, draft content, and save to your library.
       </p>
 
-      {/* Controls */}
       <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           {/* Sector */}
@@ -99,7 +97,7 @@ export default function DashboardClient() {
             />
           </div>
 
-          {/* Prompt / Content */}
+          {/* Prompt */}
           <div>
             <label className="block text-sm font-medium">Prompt</label>
             <textarea
