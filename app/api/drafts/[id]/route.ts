@@ -44,8 +44,8 @@ export async function PATCH(
   const supabase = createServerSupabase();
   const { data, error } = await supabase
     .from("drafts")
-    // Cast to a generic record so Supabase's "never" constraint doesn't bite us.
-    .update(update as Record<string, unknown>)
+    // IMPORTANT: avoid strict generic typing here until we add generated types
+    .update(update as any)
     .eq("id", params.id)
     .select("*")
     .single();
