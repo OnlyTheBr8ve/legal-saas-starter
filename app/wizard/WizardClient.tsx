@@ -1,141 +1,128 @@
-// app/wizard/WizardClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
-import { SECTORS as RAW_SECTORS } from "@/lib/sector-config";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { SECTORS, SECTOR_QUESTIONS } from "@/lib/sector-config";
+import SaveDraftButton from "@/components/SaveDraftButton";
 
-// Normalize sectors like on dashboard
-type SectorOption = { value: string; label: string };
-function toOptions(input: unknown): SectorOption[] {
+// ---- Helper: normalize SECTORS to options ----
+type Option = { value: string; label: string };
+function toOptions(input: unknown): Option[] {
+  if (!input) return [];
   if (Array.isArray(input)) {
     return (input as any[])
-      .map((it) =>
-        it && typeof it.value === "string" && typeof it.label === "string"
-          ? ({ value: it.value, label: it.label } as SectorOption)
-          : null
-      )
-      .filter(Boolean) as SectorOption[];
+      .filter((o) => o && typeof o.value === "string")
+      .map((o) => ({ value: o.value as string, label: String(o.label ?? o.value) }));
   }
-  if (input && typeof input === "object") {
-    return Object.entries(input as Record<string, string>).map(
-      ([value, label]) => ({ value, label })
-    );
+  if (typeof input === "object") {
+    return Object.entries(input as Record<string, any>).map(([k, v]) => {
+      const label = typeof v === "string" ? v : v?.label ?? k;
+      return { value: k, label: String(label) };
+    });
   }
   return [];
 }
+const sectorOptions = toOptions(SECTORS);
 
-// A tiny, template-specific question bank.
-// Add more slugs over time.
-const TEMPLATE_QUESTIONS: Record<
-  string,
-  { id: string; label: string; placeholder?: string }[]
-> = {
-  "cookies-policy": [
-    { id: "site_name", label: "Website / App name" },
-    { id: "site_url", label: "Website URL", placeholder: "https://…" },
-    {
-      id: "cookies_types",
-      label:
-        "What cookies do you use? (e.g., strictly necessary, analytics, advertising)",
-    },
-    {
-      id: "third_parties",
-      label:
-        "Any third-party tools that set cookies? (e.g., Google Analytics, Meta, Hotjar)",
-    },
-    {
-      id: "consent_method",
-      label:
-        "How do you obtain consent? (e.g., banner, settings, reject all option)",
-    },
-    {
-      id: "retention",
-      label: "Typical retention periods (if known)",
-    },
-    {
-      id: "contact",
-      label: "Contact for privacy queries (email / address)",
-    },
-  ],
+// ---- Helper: normalize SECTOR_QUESTIONS to a safe map<string, {id, q}[]> ----
+type QA = { id: string; q: string };
+function getQuestionsFor(sec: string | null | undefined): QA[] {
+  const raw = (SECTOR_QUESTIONS as any) ?? {};
+  const arr: any[] =
+    (sec && (raw[sec] as any[])) ||
+    (raw["general"] as any[]) ||
+    [];
+  return (Array.isArray(arr) ? arr : []).map((item, i) => {
+    if (typeof item === "string") return { id: `${i}`, q: item };
+    if (item && typeof item.question === "string") return { id: `${i}`, q: item.question };
+    if (item && typeof item.q === "string") return { id: `${i}`, q: item.q };
+    return { id: `${i}`, q: String(item) };
+  });
+}
 
-  // default fallback if slug not found:
-  _default: [
-    { id: "party_a", label: "Party A (name/entity)" },
-    { id: "party_b", label: "Party B (name/entity)" },
-    { id: "effective_date", label: "Effective date" },
-    { id: "term", label: "Term / duration" },
-    { id: "governing_law", label: "Governing law / jurisdiction" },
-  ],
-};
+export default function WizardClient() {
+  const params = useSearchParams();
+  const initialSector = params?.get("sector") ?? params?.get("type") ?? "";
+  const [sector, setSector] = useState<string>(initialSector);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [content, setContent] = useState<string>("");
 
-type Props = {
-  templateSlug?: string;
-  initialSector?: string;
-};
+  useEffect(() => {
+    const urlSector = params?.get("sector") ?? params?.get("type") ?? "";
+    setSector((prev) => (prev || urlSector ? (prev || urlSector) : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
-export default function WizardClient({ templateSlug, initialSector }: Props) {
-  const sectors = useMemo(() => toOptions(RAW_SECTORS), []);
-  const [sector, setSector] = useState<string>(initialSector || "");
-  const questions =
-    TEMPLATE_QUESTIONS[templateSlug || ""] ?? TEMPLATE_QUESTIONS._default;
+  const questions = useMemo(() => getQuestionsFor(sector), [sector]);
 
   return (
-    <main className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold">Wizard</h1>
-      <p className="mt-1 text-zinc-400">
-        {templateSlug
-          ? `Template: ${templateSlug.replace(/-/g, " ")}`
-          : "Generic template"}
-      </p>
-
-      {/* Sector selection (now actually sets state) */}
-      <section className="mt-6">
-        <label className="block text-sm mb-2">Sector</label>
+    <main className="mx-auto max-w-3xl px-4 py-6">
+      {/* Sector picker */}
+      <section>
+        <label className="block text-sm text-zinc-400 mb-1">Sector</label>
         <select
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 p-2"
           value={sector}
           onChange={(e) => setSector(e.target.value)}
+          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none"
         >
           <option value="">— Choose a sector —</option>
-          {sectors.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          {sectorOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
-        {sector && (
-          <p className="mt-2 text-xs text-zinc-400">
-            Selected sector: <span className="font-medium">{sector}</span>
-          </p>
+      </section>
+
+      {/* Questions */}
+      <section className="mt-6 space-y-4">
+        {questions.length === 0 ? (
+          <p className="text-sm text-zinc-400">No sector questions. You can still draft below.</p>
+        ) : (
+          questions.map((qa) => (
+            <div key={qa.id}>
+              <label className="block text-sm text-zinc-300 mb-1">{qa.q}</label>
+              <input
+                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none"
+                value={answers[qa.id] ?? ""}
+                onChange={(e) =>
+                  setAnswers((prev) => ({ ...prev, [qa.id]: e.target.value }))
+                }
+                placeholder="Type your answer…"
+              />
+            </div>
+          ))
         )}
       </section>
 
-      {/* Dynamic questions based on template slug */}
-      <section className="mt-8 grid gap-4">
-        {questions.map((q) => (
-          <div key={q.id} className="grid gap-2">
-            <label className="text-sm">{q.label}</label>
-            <input
-              className="w-full rounded-md border border-zinc-700 bg-zinc-900 p-2"
-              placeholder={q.placeholder || ""}
-            />
-          </div>
-        ))}
-      </section>
+      {/* Draft editor */}
+      <section className="mt-6">
+        <label className="block text-sm text-zinc-300 mb-1">Draft</label>
+        <textarea
+          className="h-56 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Your generated or manually written draft…"
+        />
+        <div className="mt-3 flex gap-3">
+          {/* Hook into your generate handler if you have one */}
+          <button
+            type="button"
+            className="rounded-md bg-zinc-800 px-3 py-2 text-sm"
+            onClick={() => {
+              const blocks = Object.values(answers)
+                .filter(Boolean)
+                .map((a) => `- ${a}`)
+                .join("\n");
+              setContent((c) => (c ? `${c}\n\n${blocks}` : blocks));
+            }}
+          >
+            Insert answers
+          </button>
 
-      <div className="mt-6">
-        <button
-          type="button"
-          className="rounded bg-white/10 px-4 py-2 hover:bg-white/20"
-          onClick={() =>
-            alert(
-              "This is the skeleton wizard. Next step is wiring these answers into a draft!"
-            )
-          }
-        >
-          Continue
-        </button>
-      </div>
+          <SaveDraftButton sector={sector} content={content} />
+        </div>
+      </section>
     </main>
   );
 }
