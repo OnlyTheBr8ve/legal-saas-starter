@@ -1,13 +1,20 @@
 // app/dashboard/page.tsx
-import { Suspense } from "react";
 import DashboardClient from "./DashboardClient";
 
-export const dynamic = "force-dynamic"; // avoid SSG complaining around client hooks
+export const runtime = "nodejs";
 
 export default function Page() {
+  // Server component wrapper – the client UI lives in DashboardClient
   return (
-    <Suspense fallback={<div className="p-6 text-zinc-400">Loading…</div>}>
-      <DashboardClient />
-    </Suspense>
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <h1 className="text-4xl font-bold">Dashboard</h1>
+      <p className="text-zinc-400 mt-2">
+        Select a sector below, draft your text, and save it to Supabase.
+      </p>
+
+      <div className="mt-8">
+        <DashboardClient />
+      </div>
+    </main>
   );
 }
