@@ -1,20 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
-
-// If you keep your sector constants elsewhere, adjust this import:
-import { SECTORS } from '@/lib/templates'; // works whether SECTORS is an array of {value,label} or a map
+import { SECTORS } from '@/lib/templates'; // array or map is fine
 
 type Draft = {
   id: string;
@@ -26,10 +13,12 @@ type Draft = {
 };
 
 function normalizeSectorOptions(source: unknown): { value: string; label: string }[] {
-  // Handles both: Array<{ value,label }> OR Record<string,string>
   if (Array.isArray(source)) {
-    // @ts-ignore - be lenient, we just need value/label
-    return source.map((s) => ({ value: String(s.value ?? s), label: String(s.label ?? s.value ?? s) }));
+    // @ts-ignore — accept either strings or {value,label}
+    return source.map((s) => ({
+      value: String(s.value ?? s),
+      label: String(s.label ?? s.value ?? s),
+    }));
   }
   if (source && typeof source === 'object') {
     return Object.entries(source as Record<string, string>).map(([value, label]) => ({
@@ -37,7 +26,6 @@ function normalizeSectorOptions(source: unknown): { value: string; label: string
       label: String(label || value),
     }));
   }
-  // Fallback options so the UI isn't empty
   return [
     { value: 'general', label: 'General / Any' },
     { value: 'professional_services', label: 'Professional Services' },
@@ -47,21 +35,20 @@ function normalizeSectorOptions(source: unknown): { value: string; label: string
 }
 
 export default function DashboardClient() {
-  // --- Sector ---
+  // Sector
   const sectorOptions = useMemo(() => normalizeSectorOptions(SECTORS), []);
   const [sector, setSector] = useState<string>(sectorOptions[0]?.value ?? 'general');
 
-  // --- Editor state ---
-  const [title, setTitle] = useState<string>('');
-  const [content, setContent] = useState<string>('');
+  // Editor
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
 
-  // --- Drafts state ---
+  // Drafts
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
 
-  // Load drafts from API
   const loadDrafts = useCallback(async () => {
     try {
       setLoading(true);
@@ -70,8 +57,8 @@ export default function DashboardClient() {
       const data = (await res.json()) as { drafts: Draft[] } | Draft[];
       const list = Array.isArray(data) ? data : data.drafts;
       setDrafts(Array.isArray(list) ? list : []);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -81,7 +68,6 @@ export default function DashboardClient() {
     loadDrafts();
   }, [loadDrafts]);
 
-  // Filtered list
   const filteredDrafts = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return drafts;
@@ -89,24 +75,23 @@ export default function DashboardClient() {
       (d) =>
         d.title?.toLowerCase().includes(q) ||
         d.content?.toLowerCase().includes(q) ||
-        (d.sector ?? '').toLowerCase().includes(q),
+        (d.sector ?? '').toLowerCase().includes(q)
     );
   }, [drafts, search]);
 
-  // Click a draft => recall into editor + sector
-  const handleSelectDraft = useCallback(
-    (d: Draft) => {
-      setSelectedId(d.id);
-      setTitle(d.title || '');
-      setContent(d.content || '');
-      if (d.sector) setSector(d.sector);
-    },
-    [setSelectedId, setTitle, setContent, setSector],
-  );
+  const handleSelectDraft = useCallback((d: Draft) => {
+    setSelectedId(d.id);
+    setTitle(d.title || '');
+    setContent(d.content || '');
+    if (d.sector) setSector(d.sector);
+  }, []);
 
-  // Save => POST to /api/drafts, then refresh list and select the new/updated item
   const handleSave = useCallback(async () => {
-    const body = { title: title?.trim() || 'Untitled draft', content: content || '', sector: sector || null };
+    const body = {
+      title: title?.trim() || 'Untitled draft',
+      content: content || '',
+      sector: sector || null,
+    };
     const res = await fetch('/api/drafts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,7 +103,6 @@ export default function DashboardClient() {
       return;
     }
     const saved = (await res.json()) as Draft;
-    // Reload list and focus the saved row
     await loadDrafts();
     setSelectedId(saved.id);
     alert(`Saved “${saved.title}”`);
@@ -130,31 +114,29 @@ export default function DashboardClient() {
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <label className="mb-2 block text-sm text-zinc-400">Sector</label>
         <div className="flex flex-col gap-3">
-          <Select value={sector} onValueChange={setSector}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="— Choose a sector —" />
-            </SelectTrigger>
-            <SelectContent>
-              {sectorOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-600"
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+          >
+            {sectorOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
 
-          {/* Quick pick chips (optional) */}
           <div className="flex flex-wrap gap-2">
             {sectorOptions.slice(0, 10).map((opt) => (
               <button
                 key={opt.value}
+                type="button"
                 className={`rounded-full px-3 py-1 text-sm transition ${
                   sector === opt.value
                     ? 'bg-violet-600 text-white'
                     : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                 }`}
                 onClick={() => setSector(opt.value)}
-                type="button"
               >
                 {opt.label}
               </button>
@@ -162,8 +144,8 @@ export default function DashboardClient() {
           </div>
 
           <div className="flex items-center gap-3 text-xs text-zinc-400">
-            <Badge variant="secondary">{`Options: ${sectorOptions.length}`}</Badge>
-            <Badge variant="outline">from SECTORS</Badge>
+            <span className="rounded border border-zinc-700 bg-zinc-800/60 px-2 py-0.5">{`Options: ${sectorOptions.length}`}</span>
+            <span className="rounded border border-zinc-700 bg-zinc-800/60 px-2 py-0.5">from SECTORS</span>
             <span>
               Selected:{' '}
               <span className="text-zinc-200">
@@ -177,22 +159,27 @@ export default function DashboardClient() {
       {/* Editor */}
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h3 className="mb-3 text-sm font-medium text-zinc-300">Editor</h3>
-        <div className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-          <Input
+        <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto]">
+          <input
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-600"
             placeholder="Draft title…"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full"
           />
-          <Button onClick={handleSave} className="sm:w-40">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+          >
             Save draft
-          </Button>
+          </button>
         </div>
-        <Textarea
+
+        <textarea
+          className="h-64 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-600"
           placeholder="Write or paste text here…"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="h-64"
         />
         <div className="mt-2 text-right text-xs text-zinc-500">{content.length} characters</div>
       </section>
@@ -200,15 +187,19 @@ export default function DashboardClient() {
       {/* Drafts */}
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <div className="mb-3 flex items-center gap-2">
-          <Input
+          <input
+            className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-600"
             placeholder="Search drafts…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
           />
-          <Button variant="secondary" onClick={loadDrafts}>
+          <button
+            type="button"
+            onClick={loadDrafts}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
+          >
             {loading ? 'Loading…' : 'Reload'}
-          </Button>
+          </button>
         </div>
 
         {filteredDrafts.length === 0 ? (
