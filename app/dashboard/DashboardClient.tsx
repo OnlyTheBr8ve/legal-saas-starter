@@ -17,7 +17,6 @@ type Option = { value: string; label: string };
 
 function normalizeSectors(input: unknown): Option[] {
   try {
-    // 1) Array of { value, label }
     if (Array.isArray(input)) {
       const arr = input as any[];
       if (arr.length > 0) {
@@ -30,17 +29,13 @@ function normalizeSectors(input: unknown): Option[] {
         }
       }
     }
-
-    // 2) Record<string, string | { label: string }>
     if (input && typeof input === "object") {
       return Object.entries(input as Record<string, any>).map(([k, v]) => {
         const label = v && typeof v === "object" && "label" in v ? v.label : v;
         return { value: k, label: String(label ?? k) };
       });
     }
-  } catch {
-    // ignore and fall back
-  }
+  } catch {}
   return [];
 }
 
@@ -61,11 +56,17 @@ export default function DashboardClient() {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [filter, setFilter] = useState("");
 
-  // Normalize first; if empty, use a safe built-in fallback.
   const normalized = useMemo(() => normalizeSectors(SECTORS), []);
   const sectorOptions: Option[] = normalized.length > 0 ? normalized : [...BUILTIN_SECTORS];
-
   const usingFallback = normalized.length === 0;
+
+  // Make sure we always have a sector once options arrive
+  useEffect(() => {
+    if (!sector && sectorOptions.length > 0) {
+      setSector(sectorOptions[0].value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectorOptions.length]);
 
   const loadDrafts = useCallback(async () => {
     try {
@@ -127,43 +128,69 @@ export default function DashboardClient() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* LEFT: sector + editor */}
+      {/* LEFT */}
       <div className="space-y-4">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <label className="block text-sm font-medium text-zinc-300">Sector</label>
-          <select
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-900 p-2 text-zinc-100"
-          >
-            <option value="">— Choose a sector —</option>
-            {sectorOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
 
-          {/* Temporary debug – remove once it works for you */}
-          <div className="mt-3 text-xs">
-            <div className="text-zinc-400">
-              Options visible: <b>{sectorOptions.length}</b>{" "}
-              {usingFallback ? (
-                <span className="ml-2 rounded bg-amber-600/20 px-2 py-0.5 text-amber-300">
-                  using fallback
-                </span>
-              ) : (
-                <span className="ml-2 rounded bg-emerald-600/20 px-2 py-0.5 text-emerald-300">
-                  from SECTORS
-                </span>
-              )}
+          {/* DROPDOWN (with defensive styles so overlays can't swallow clicks) */}
+          <div className="relative mt-2">
+            <select
+              value={sector}
+              onChange={(e) => {
+                setSector(e.target.value);
+              }}
+              className="z-50 mt-0 w-full rounded-md border border-zinc-700 bg-zinc-900 p-2 text-zinc-100 outline-none"
+              style={{
+                position: "relative",
+                pointerEvents: "auto",
+              }}
+            >
+              {sectorOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* CHIP PICKER — always works */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sectorOptions.map((opt) => {
+              const active = opt.value === sector;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSector(opt.value)}
+                  className={
+                    "rounded-full px-3 py-1 text-xs transition " +
+                    (active
+                      ? "bg-indigo-600 text-white"
+                      : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700")
+                  }
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* DEBUG — remove after it's working */}
+          <div className="mt-3 text-xs text-zinc-400">
+            Options: <b>{sectorOptions.length}</b>{" "}
+            {usingFallback ? (
+              <span className="ml-2 rounded bg-amber-600/20 px-2 py-0.5 text-amber-300">
+                using fallback
+              </span>
+            ) : (
+              <span className="ml-2 rounded bg-emerald-600/20 px-2 py-0.5 text-emerald-300">
+                from SECTORS
+              </span>
+            )}
+            <div className="mt-1">
+              Selected: <b>{sector || "(none)"}</b>
             </div>
-            <details className="mt-1 text-zinc-500">
-              <summary className="cursor-pointer">Inspect SECTORS</summary>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-zinc-900 p-2">
-                {safePreview(SECTORS)}
-              </pre>
-            </details>
           </div>
         </div>
 
@@ -191,7 +218,7 @@ export default function DashboardClient() {
         </div>
       </div>
 
-      {/* RIGHT: drafts list */}
+      {/* RIGHT */}
       <div className="space-y-4">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <div className="mb-3 flex items-center gap-2">
@@ -232,17 +259,4 @@ export default function DashboardClient() {
       </div>
     </div>
   );
-}
-
-/** Safe preview helper so the debug block never crashes the page */
-function safePreview(v: unknown) {
-  try {
-    return JSON.stringify(v, null, 2)?.slice(0, 4000);
-  } catch {
-    try {
-      return String(v);
-    } catch {
-      return "<unrenderable>";
-    }
-  }
 }
