@@ -5,31 +5,54 @@ import DraftLibraryPanel, { DraftItem } from "@/components/DraftLibraryPanel";
 import SaveDraftButton from "@/components/SaveDraftButton";
 import { SECTORS } from "@/lib/sector-config";
 
-/**
- * Full dashboard client:
- * - Sector dropdown (works with SECTORS as array or record)
- * - Title + Editor
- * - Save Draft button (uses your existing SaveDraftButton component)
- * - Draft library list; click an item to load it back into the editor
- */
+/** Robust normalizer: accepts many shapes and returns [{value,label}] */
+function normalizeSectors(input: unknown): Array<{ value: string; label: string }> {
+  // Array case
+  if (Array.isArray(input)) {
+    return (input as any[]).map((x) => {
+      if (typeof x === "string") {
+        return { value: x, label: x };
+      }
+      if (x && typeof x === "object") {
+        const obj = x as Record<string, unknown>;
+        // Try a bunch of sensible keys
+        const valueRaw =
+          obj.value ??
+          obj.id ??
+          obj.slug ??
+          obj.key ??
+          obj.code ??
+          obj.name ??
+          obj.label;
+        const labelRaw = obj.label ?? obj.name ?? obj.title ?? valueRaw;
+
+        const value = String(valueRaw ?? "");
+        const label = String(labelRaw ?? value);
+        return { value, label };
+      }
+      // Fallback
+      return { value: String(x), label: String(x) };
+    });
+  }
+
+  // Record map case
+  if (input && typeof input === "object") {
+    return Object.entries(input as Record<string, unknown>).map(([k, v]) => ({
+      value: k,
+      label: String(v ?? k),
+    }));
+  }
+
+  return [];
+}
+
 export default function DashboardClient() {
   const [sector, setSector] = useState<string>("");
   const [title, setTitle] = useState<string>("");
   const [content, setContent] = useState<string>("");
 
-  // Normalize SECTORS => [{ value, label }]
-  const sectorOptions = useMemo(() => {
-    if (Array.isArray(SECTORS)) {
-      // Already of shape { value, label }
-      return SECTORS as Array<{ value: string; label: string }>;
-    }
-    // Record<string, string>
-    return Object.entries(SECTORS as Record<string, string>).map(
-      ([value, label]) => ({ value, label })
-    );
-  }, []);
+  const sectorOptions = useMemo(() => normalizeSectors(SECTORS), []);
 
-  // When user clicks a draft in the library
   const onPickDraft = (d: DraftItem) => {
     setTitle(d.title || "");
     setContent(d.content || "");
@@ -79,7 +102,6 @@ export default function DashboardClient() {
         />
 
         <div className="mt-3">
-          {/* Save with current values */}
           <SaveDraftButton title={title} content={content} sector={sector} />
         </div>
       </section>
