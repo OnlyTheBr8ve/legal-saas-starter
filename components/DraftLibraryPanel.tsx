@@ -2,350 +2,107 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Draft = {
+export type DraftItem = {
   id: string;
   title: string;
   content: string;
-  sector?: string;
-  createdAt: string; // ISO
-  updatedAt: string; // ISO
+  sector?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-const STORAGE_KEY = "drafts:v1";
+type Props = {
+  /** Called when the user picks a draft in the list */
+  onPick?: (d: DraftItem) => void;
+  /** Optional filter by sector (so the list only shows current sector’s drafts) */
+  sector?: string;
+};
 
-function safeParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
+const STORAGE_KEY = "drafts_v1";
+
+function readLocalDrafts(): DraftItem[] {
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T) : fallback;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(
+      (d) => d && typeof d.id === "string" && typeof d.title === "string"
+    );
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-function loadDrafts(): Draft[] {
-  if (typeof window === "undefined") return [];
-  return safeParse<Draft[]>(localStorage.getItem(STORAGE_KEY), []);
-}
+export default function DraftLibraryPanel({ onPick, sector }: Props) {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<DraftItem[]>([]);
 
-function saveDrafts(drafts: Draft[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
-}
+  const reload = () => setItems(readLocalDrafts());
 
-function formatWhen(iso?: string) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString();
-  } catch {
-    return "";
-  }
-}
-
-export default function DraftLibraryPanel() {
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [renameId, setRenameId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-
-  // Initial load (and cross-tab sync)
   useEffect(() => {
-    setDrafts(loadDrafts());
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) setDrafts(loadDrafts());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    reload();
   }, []);
 
-  // Derived
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return drafts;
-    return drafts.filter((d) => {
-      const hay = `${d.title} ${d.content} ${d.sector ?? ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [drafts, query]);
-
-  const selected = useMemo(
-    () => drafts.find((d) => d.id === selectedId) ?? null,
-    [drafts, selectedId]
-  );
-
-  // Actions
-  const onReload = () => setDrafts(loadDrafts());
-
-  const onDelete = (id: string) => {
-    const next = drafts.filter((d) => d.id !== id);
-    saveDrafts(next);
-    setDrafts(next);
-    if (selectedId === id) setSelectedId(null);
-    if (renameId === id) {
-      setRenameId(null);
-      setRenameValue("");
+    let res = items;
+    if (sector) res = res.filter((d) => (d.sector || "") === sector);
+    if (q.trim()) {
+      const needle = q.toLowerCase();
+      res = res.filter(
+        (d) =>
+          d.title.toLowerCase().includes(needle) ||
+          d.content.toLowerCase().includes(needle)
+      );
     }
-  };
-
-  const onClearAll = () => {
-    if (!confirm("Delete all drafts? This cannot be undone.")) return;
-    saveDrafts([]);
-    setDrafts([]);
-    setSelectedId(null);
-    setRenameId(null);
-    setRenameValue("");
-  };
-
-  const startRename = (id: string, current: string) => {
-    setRenameId(id);
-    setRenameValue(current);
-  };
-
-  const commitRename = () => {
-    if (!renameId) return;
-    const next = drafts.map((d) =>
-      d.id === renameId ? { ...d, title: renameValue || "Untitled", updatedAt: new Date().toISOString() } : d
+    // newest first
+    return res.sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt || 0).getTime() -
+        new Date(a.updatedAt || a.createdAt || 0).getTime()
     );
-    saveDrafts(next);
-    setDrafts(next);
-    setRenameId(null);
-    setRenameValue("");
-  };
-
-  const cancelRename = () => {
-    setRenameId(null);
-    setRenameValue("");
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert("Draft content copied to clipboard.");
-    } catch {
-      // Fallback
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      alert("Draft content copied to clipboard.");
-    }
-  };
-
-  const importFromJSON = (jsonText: string) => {
-    try {
-      const parsed = JSON.parse(jsonText);
-      if (!Array.isArray(parsed)) throw new Error("JSON must be an array of drafts");
-      // Very light validation
-      const normalized: Draft[] = parsed
-        .map((x) => ({
-          id: String(x.id ?? crypto.randomUUID()),
-          title: String(x.title ?? "Untitled"),
-          content: String(x.content ?? ""),
-          sector: x.sector ? String(x.sector) : undefined,
-          createdAt: x.createdAt ? String(x.createdAt) : new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }))
-        .slice(0, 1000); // guardrail
-      saveDrafts(normalized);
-      setDrafts(normalized);
-      alert(`Imported ${normalized.length} draft(s).`);
-    } catch (e: any) {
-      alert(`Import failed: ${e?.message ?? "Invalid JSON"}`);
-    }
-  };
-
-  const exportToJSON = () => {
-    const blob = new Blob([JSON.stringify(drafts, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "drafts-export.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  }, [items, q, sector]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Left: list */}
-      <section className="md:col-span-1 rounded-lg border border-white/10 bg-black/20 p-4">
-        <div className="flex items-center gap-2">
-          <input
-            className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-white/20"
-            placeholder="Search drafts…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search drafts"
-          />
-          <button
-            className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm hover:bg-black/40"
-            onClick={onReload}
-            type="button"
-          >
-            Reload
-          </button>
-        </div>
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search drafts…"
+          className="w-full rounded-md bg-zinc-900/60 px-3 py-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-600"
+        />
+        <button
+          onClick={reload}
+          className="rounded-md bg-zinc-800 px-3 py-2 text-sm hover:bg-zinc-700"
+        >
+          Reload
+        </button>
+      </div>
 
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-white/60">{filtered.length} draft(s)</span>
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs hover:bg-black/40"
-              type="button"
-              onClick={exportToJSON}
+      {filtered.length === 0 ? (
+        <p className="text-sm text-zinc-400">No drafts yet.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-800 rounded-md border border-zinc-800">
+          {filtered.map((d) => (
+            <li
+              key={d.id}
+              className="cursor-pointer px-4 py-3 hover:bg-zinc-900"
+              onClick={() => onPick?.(d)}
             >
-              Export
-            </button>
-            <label className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs hover:bg-black/40 cursor-pointer">
-              Import
-              <input
-                type="file"
-                accept="application/json"
-                className="hidden"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  const txt = await f.text();
-                  importFromJSON(txt);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
-            <button
-              className="rounded-md border border-rose-500/30 text-rose-300 bg-rose-900/20 px-2 py-1 text-xs hover:bg-rose-900/30"
-              type="button"
-              onClick={onClearAll}
-            >
-              Clear all
-            </button>
-          </div>
-        </div>
-
-        <ul className="mt-3 divide-y divide-white/5 max-h-[60vh] overflow-auto">
-          {filtered.map((d) => {
-            const isSelected = d.id === selectedId;
-            return (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(d.id)}
-                  className={`w-full text-left px-3 py-2 hover:bg-white/5 ${
-                    isSelected ? "bg-white/10" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">
-                        {renameId === d.id ? (
-                          <input
-                            autoFocus
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitRename();
-                              if (e.key === "Escape") cancelRename();
-                            }}
-                            className="rounded-sm bg-black/40 px-2 py-1 border border-white/10"
-                          />
-                        ) : (
-                          d.title || "Untitled"
-                        )}
-                      </div>
-                      <div className="text-xs text-white/60">
-                        {d.sector ? `${d.sector} • ` : ""}
-                        Updated {formatWhen(d.updatedAt)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {renameId === d.id ? (
-                        <>
-                          <button
-                            className="rounded border border-white/10 px-2 py-1 text-xs hover:bg-white/10"
-                            onClick={commitRename}
-                            type="button"
-                          >
-                            Save
-                          </button>
-                          <button
-                            className="rounded border border-white/10 px-2 py-1 text-xs hover:bg-white/10"
-                            onClick={cancelRename}
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="rounded border border-white/10 px-2 py-1 text-xs hover:bg-white/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startRename(d.id, d.title || "");
-                            }}
-                            type="button"
-                          >
-                            Rename
-                          </button>
-                          <button
-                            className="rounded border border-rose-500/30 text-rose-300 bg-rose-900/20 px-2 py-1 text-xs hover:bg-rose-900/30"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(d.id);
-                            }}
-                            type="button"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-          {filtered.length === 0 && (
-            <li className="px-3 py-6 text-sm text-white/60">No drafts yet.</li>
-          )}
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{d.title || "Untitled"}</span>
+                {d.sector ? (
+                  <span className="text-xs text-zinc-500">{d.sector}</span>
+                ) : null}
+              </div>
+              <p className="mt-1 line-clamp-2 text-sm text-zinc-400">
+                {d.content || "—"}
+              </p>
+            </li>
+          ))}
         </ul>
-      </section>
-
-      {/* Right: details */}
-      <section className="md:col-span-2 rounded-lg border border-white/10 bg-black/20 p-4 min-h-[300px]">
-        {!selected ? (
-          <div className="text-white/70">Select a draft on the left to preview.</div>
-        ) : (
-          <div className="space-y-4">
-            <header className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">{selected.title || "Untitled"}</h2>
-                <p className="text-xs text-white/60">
-                  {selected.sector ? `${selected.sector} • ` : ""}
-                  Created {formatWhen(selected.createdAt)} • Updated {formatWhen(selected.updatedAt)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm hover:bg-black/40"
-                  onClick={() => copyToClipboard(selected.content)}
-                  type="button"
-                >
-                  Copy content
-                </button>
-              </div>
-            </header>
-
-            <div className="rounded-md border border-white/10 bg-black/30 p-3 max-h-[60vh] overflow-auto whitespace-pre-wrap text-sm">
-              {selected.content || <span className="text-white/50">No content.</span>}
-            </div>
-          </div>
-        )}
-      </section>
+      )}
     </div>
   );
 }
