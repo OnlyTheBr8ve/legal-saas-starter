@@ -1,36 +1,47 @@
-// app/dashboard/DashboardClient.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SECTORS } from "@/lib/sector-config";
 
-// Extremely defensive normalizer so this works no matter how SECTORS is shaped.
-function normalizeSectors(input: unknown): { value: string; label: string }[] {
-  // 1) Array of { value, label }
-  if (Array.isArray(input)) {
-    const arr = input as any[];
-    if (arr.length && typeof arr[0] === "object" && arr[0]) {
-      const first = arr[0] as any;
-      if ("value" in first && "label" in first) {
-        return arr.map((x) => ({ value: String(x.value), label: String(x.label) }));
-      }
-      // Array of strings
-      if (typeof first === "string") {
-        return (arr as string[]).map((s) => ({ value: s, label: s }));
+/** Built-in fallback so the selector ALWAYS has options */
+const BUILTIN_SECTORS = [
+  { value: "general", label: "General" },
+  { value: "saas", label: "SaaS / Software" },
+  { value: "ecommerce", label: "E-commerce" },
+  { value: "healthcare", label: "Healthcare" },
+  { value: "finance", label: "Finance" },
+  { value: "media", label: "Media" },
+] as const;
+
+type Option = { value: string; label: string };
+
+function normalizeSectors(input: unknown): Option[] {
+  try {
+    // 1) Array of { value, label }
+    if (Array.isArray(input)) {
+      const arr = input as any[];
+      if (arr.length > 0) {
+        const first = arr[0];
+        if (first && typeof first === "object" && "value" in first && "label" in first) {
+          return arr.map((x) => ({ value: String(x.value), label: String(x.label) }));
+        }
+        if (typeof first === "string") {
+          return (arr as string[]).map((s) => ({ value: s, label: s }));
+        }
       }
     }
-  }
 
-  // 2) Record<string, string | {label:string}>
-  if (input && typeof input === "object") {
-    return Object.entries(input as Record<string, any>).map(([k, v]) => {
-      const label = v && typeof v === "object" && "label" in v ? v.label : v;
-      return { value: k, label: String(label ?? k) };
-    });
+    // 2) Record<string, string | { label: string }>
+    if (input && typeof input === "object") {
+      return Object.entries(input as Record<string, any>).map(([k, v]) => {
+        const label = v && typeof v === "object" && "label" in v ? v.label : v;
+        return { value: k, label: String(label ?? k) };
+      });
+    }
+  } catch {
+    // ignore and fall back
   }
-
-  // 3) Fallback
-  return [{ value: "general", label: "General" }];
+  return [];
 }
 
 type DraftRow = {
@@ -43,14 +54,18 @@ type DraftRow = {
 };
 
 export default function DashboardClient() {
-  const [sector, setSector] = useState<string>(""); // empty means “not chosen”
+  const [sector, setSector] = useState<string>("");
   const [content, setContent] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [filter, setFilter] = useState("");
 
-  const sectorOptions = useMemo(() => normalizeSectors(SECTORS), []);
+  // Normalize first; if empty, use a safe built-in fallback.
+  const normalized = useMemo(() => normalizeSectors(SECTORS), []);
+  const sectorOptions: Option[] = normalized.length > 0 ? normalized : [...BUILTIN_SECTORS];
+
+  const usingFallback = normalized.length === 0;
 
   const loadDrafts = useCallback(async () => {
     try {
@@ -91,8 +106,6 @@ export default function DashboardClient() {
       if (!res.ok) throw new Error(await res.text());
       await loadDrafts();
       alert("Draft saved!");
-      // Keep the content so you can keep editing; clear if you prefer:
-      // setContent("");
     } catch (e) {
       console.error("Save failed:", e);
       alert("Save failed. Open DevTools → Network to see the error.");
@@ -114,9 +127,8 @@ export default function DashboardClient() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* Left column: sector + editor + actions */}
+      {/* LEFT: sector + editor */}
       <div className="space-y-4">
-        {/* Sector selector (native <select> so it always works) */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <label className="block text-sm font-medium text-zinc-300">Sector</label>
           <select
@@ -131,9 +143,30 @@ export default function DashboardClient() {
               </option>
             ))}
           </select>
+
+          {/* Temporary debug – remove once it works for you */}
+          <div className="mt-3 text-xs">
+            <div className="text-zinc-400">
+              Options visible: <b>{sectorOptions.length}</b>{" "}
+              {usingFallback ? (
+                <span className="ml-2 rounded bg-amber-600/20 px-2 py-0.5 text-amber-300">
+                  using fallback
+                </span>
+              ) : (
+                <span className="ml-2 rounded bg-emerald-600/20 px-2 py-0.5 text-emerald-300">
+                  from SECTORS
+                </span>
+              )}
+            </div>
+            <details className="mt-1 text-zinc-500">
+              <summary className="cursor-pointer">Inspect SECTORS</summary>
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-zinc-900 p-2">
+                {safePreview(SECTORS)}
+              </pre>
+            </details>
+          </div>
         </div>
 
-        {/* Text editor */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <label className="block text-sm font-medium text-zinc-300">Editor</label>
           <textarea
@@ -158,7 +191,7 @@ export default function DashboardClient() {
         </div>
       </div>
 
-      {/* Right column: drafts list / preview */}
+      {/* RIGHT: drafts list */}
       <div className="space-y-4">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <div className="mb-3 flex items-center gap-2">
@@ -196,14 +229,20 @@ export default function DashboardClient() {
             </ul>
           )}
         </div>
-
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-sm text-zinc-400">
-            Tip: open a new tab to <code>/api/drafts</code> to see the raw JSON
-            the app is reading/writing.
-          </p>
-        </div>
       </div>
     </div>
   );
+}
+
+/** Safe preview helper so the debug block never crashes the page */
+function safePreview(v: unknown) {
+  try {
+    return JSON.stringify(v, null, 2)?.slice(0, 4000);
+  } catch {
+    try {
+      return String(v);
+    } catch {
+      return "<unrenderable>";
+    }
+  }
 }
