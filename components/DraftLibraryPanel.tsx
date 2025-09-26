@@ -12,9 +12,7 @@ export type DraftItem = {
 };
 
 type Props = {
-  /** Called when the user picks a draft in the list */
   onPick?: (d: DraftItem) => void;
-  /** Optional filter by sector (so the list only shows current sector’s drafts) */
   sector?: string;
 };
 
@@ -55,7 +53,6 @@ export default function DraftLibraryPanel({ onPick, sector }: Props) {
           d.content.toLowerCase().includes(needle)
       );
     }
-    // newest first
     return res.sort(
       (a, b) =>
         new Date(b.updatedAt || b.createdAt || 0).getTime() -
