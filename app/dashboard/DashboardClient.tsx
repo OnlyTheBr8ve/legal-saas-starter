@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SECTORS } from "@/lib/sector-config";
+import { SECTORS } from "@/lib/sector-config"; // ok if empty; we fall back
 
 /** Built-in fallback so the selector ALWAYS has options */
 const BUILTIN_SECTORS = [
@@ -31,7 +31,7 @@ function normalizeSectors(input: unknown): Option[] {
     }
     if (input && typeof input === "object") {
       return Object.entries(input as Record<string, any>).map(([k, v]) => {
-        const label = v && typeof v === "object" && "label" in v ? v.label : v;
+        const label = v && typeof v === "object" && "label" in v ? (v as any).label : v;
         return { value: k, label: String(label ?? k) };
       });
     }
@@ -60,7 +60,12 @@ export default function DashboardClient() {
   const sectorOptions: Option[] = normalized.length > 0 ? normalized : [...BUILTIN_SECTORS];
   const usingFallback = normalized.length === 0;
 
-  // Make sure we always have a sector once options arrive
+  // DEBUG: prove which options the page has
+  useEffect(() => {
+    console.log("[Dashboard] sectorOptions", sectorOptions);
+  }, [sectorOptions]);
+
+  // Pick the first option on mount if none selected
   useEffect(() => {
     if (!sector && sectorOptions.length > 0) {
       setSector(sectorOptions[0].value);
@@ -127,73 +132,66 @@ export default function DashboardClient() {
   }, [drafts, filter]);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* LEFT */}
-      <div className="space-y-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <label className="block text-sm font-medium text-zinc-300">Sector</label>
+    <div className="space-y-6">
+      {/* VERSION BADGE so you can see the new file is live */}
+      <div className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
+        Dashboard v2 • options: <b>{sectorOptions.length}</b>{" "}
+        {usingFallback ? (
+          <span className="ml-2 rounded bg-amber-600/20 px-2 py-0.5 text-amber-300">
+            fallback
+          </span>
+        ) : (
+          <span className="ml-2 rounded bg-emerald-600/20 px-2 py-0.5 text-emerald-300">
+            from SECTORS
+          </span>
+        )}{" "}
+        • selected: <b>{sector || "(none)"}</b>
+      </div>
 
-          {/* DROPDOWN (with defensive styles so overlays can't swallow clicks) */}
-          <div className="relative mt-2">
-            <select
-              value={sector}
-              onChange={(e) => {
-                setSector(e.target.value);
-              }}
-              className="z-50 mt-0 w-full rounded-md border border-zinc-700 bg-zinc-900 p-2 text-zinc-100 outline-none"
-              style={{
-                position: "relative",
-                pointerEvents: "auto",
-              }}
-            >
-              {sectorOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Sector picker */}
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+        <label className="block text-sm font-medium text-zinc-300">Sector</label>
 
-          {/* CHIP PICKER — always works */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {sectorOptions.map((opt) => {
-              const active = opt.value === sector;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setSector(opt.value)}
-                  className={
-                    "rounded-full px-3 py-1 text-xs transition " +
-                    (active
-                      ? "bg-indigo-600 text-white"
-                      : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700")
-                  }
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* DEBUG — remove after it's working */}
-          <div className="mt-3 text-xs text-zinc-400">
-            Options: <b>{sectorOptions.length}</b>{" "}
-            {usingFallback ? (
-              <span className="ml-2 rounded bg-amber-600/20 px-2 py-0.5 text-amber-300">
-                using fallback
-              </span>
-            ) : (
-              <span className="ml-2 rounded bg-emerald-600/20 px-2 py-0.5 text-emerald-300">
-                from SECTORS
-              </span>
-            )}
-            <div className="mt-1">
-              Selected: <b>{sector || "(none)"}</b>
-            </div>
-          </div>
+        <div className="relative mt-2">
+          <select
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+            className="z-50 w-full rounded-md border border-zinc-700 bg-zinc-900 p-2 text-zinc-100 outline-none"
+            style={{ position: "relative", pointerEvents: "auto" }}
+          >
+            {sectorOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
+        {/* Chip picker – works even if dropdown is blocked by CSS */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {sectorOptions.map((opt) => {
+            const active = opt.value === sector;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setSector(opt.value)}
+                className={
+                  "rounded-full px-3 py-1 text-xs transition " +
+                  (active
+                    ? "bg-indigo-600 text-white"
+                    : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700")
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Drafts + editor */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <label className="block text-sm font-medium text-zinc-300">Editor</label>
           <textarea
@@ -205,7 +203,7 @@ export default function DashboardClient() {
           />
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-zinc-500">
-              {content.length.toLocaleString()} characters
+              {content.length.toLocaleString()} characters • sector: {sector || "—"}
             </div>
             <button
               onClick={onSave}
@@ -216,10 +214,7 @@ export default function DashboardClient() {
             </button>
           </div>
         </div>
-      </div>
 
-      {/* RIGHT */}
-      <div className="space-y-4">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <div className="mb-3 flex items-center gap-2">
             <input
