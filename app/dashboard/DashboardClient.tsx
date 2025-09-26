@@ -122,7 +122,6 @@ export default function DashboardClient() {
       setTitle(d.title ?? "");
       setContent(d.content ?? "");
       if (d.sector) {
-        // only set if it's one of our known options, otherwise keep current
         const ok = sectorOptions.some((o) => o.value === d.sector);
         if (ok) {
           setSector(d.sector);
@@ -205,12 +204,10 @@ export default function DashboardClient() {
             <SaveDraftButton
               content={content}
               title={title}
-              /* ✅ FIX: pass undefined (not null) when empty */
-              sector={sector || undefined}
-              onSaved={loadDrafts}
+              sector={sector || undefined} // ✅ string | undefined (never null)
             />
             <span className="text-sm text-zinc-500">
-              Saving stores to Supabase and updates the Drafts list on the right.
+              After saving, click “Refresh” in the Drafts panel to see your new item.
             </span>
           </div>
         </div>
